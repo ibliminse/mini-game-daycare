@@ -189,21 +189,22 @@ export const LEVELS = [
     office: { id: 'office', name: 'Office', x: 880, y: 50, width: 70, height: 210 },
   },
   // Level 7: E-shaped - 6 classrooms
+  // E-shape: vertical spine on left with 3 horizontal prongs extending right
   {
     name: 'Growing Minds School',
-    hallway: { x: 50, y: 50, width: 80, height: 500 },       // Main vertical on left
-    hallway2: { x: 50, y: 50, width: 400, height: 80 },      // Top horizontal
-    hallway3: { x: 50, y: 260, width: 400, height: 80 },     // Middle horizontal
-    hallway4: { x: 50, y: 470, width: 400, height: 80 },     // Bottom horizontal
+    hallway: { x: 50, y: 50, width: 80, height: 500 },       // Main vertical spine on left
+    hallway2: { x: 50, y: 50, width: 700, height: 80 },      // Top horizontal prong
+    hallway3: { x: 50, y: 260, width: 500, height: 80 },     // Middle horizontal prong
+    hallway4: { x: 50, y: 470, width: 700, height: 80 },     // Bottom horizontal prong
     classrooms: [
       { id: 'room-a', name: 'Room A', x: 130, y: 130, width: 180, height: 130 },
       { id: 'room-b', name: 'Room B', x: 330, y: 130, width: 180, height: 130 },
-      { id: 'room-c', name: 'Room C', x: 530, y: 50, width: 200, height: 210 },
-      { id: 'room-d', name: 'Room D', x: 530, y: 260, width: 200, height: 130 },
-      { id: 'room-e', name: 'Room E', x: 130, y: 340, width: 180, height: 130 },
-      { id: 'room-f', name: 'Room F', x: 330, y: 340, width: 180, height: 130 },
+      { id: 'room-c', name: 'Room C', x: 550, y: 130, width: 180, height: 130 },
+      { id: 'room-d', name: 'Room D', x: 130, y: 340, width: 180, height: 130 },
+      { id: 'room-e', name: 'Room E', x: 330, y: 340, width: 180, height: 130 },
+      { id: 'room-f', name: 'Room F', x: 550, y: 340, width: 180, height: 130 },
     ],
-    office: { id: 'office', name: 'Office', x: 530, y: 390, width: 200, height: 160 },
+    office: { id: 'office', name: 'Office', x: 750, y: 50, width: 200, height: 210 },
   },
   // Level 8: Maze layout - 8 classrooms (hardest)
   {

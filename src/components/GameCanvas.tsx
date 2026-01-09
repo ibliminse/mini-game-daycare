@@ -242,6 +242,7 @@ export default function GameCanvas() {
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (gameStateRef.current.phase !== 'playing') return;
+    e.preventDefault(); // Prevent iOS rubber-banding
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   }, []);
@@ -251,8 +252,10 @@ export default function GameCanvas() {
     e.preventDefault();
 
     const touch = e.touches[0];
-    const dx = (touch.clientX - touchStartRef.current.x) / 50;
-    const dy = (touch.clientY - touchStartRef.current.y) / 50;
+    // Dynamic sensitivity based on screen size (smaller screens = more sensitive)
+    const sensitivity = Math.min(80, Math.max(30, window.innerWidth / 12));
+    const dx = (touch.clientX - touchStartRef.current.x) / sensitivity;
+    const dy = (touch.clientY - touchStartRef.current.y) / sensitivity;
 
     handleJoystickMove(
       Math.max(-1, Math.min(1, dx)),
@@ -285,7 +288,7 @@ export default function GameCanvas() {
           ref={canvasRef}
           width={MAP_WIDTH}
           height={MAP_HEIGHT}
-          className="absolute inset-0 w-full h-full"
+          className="absolute inset-0 w-full h-full focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-yellow-400"
           style={{ imageRendering: 'pixelated' }}
           aria-label="Game canvas - use arrow keys or WASD to move"
           tabIndex={0}

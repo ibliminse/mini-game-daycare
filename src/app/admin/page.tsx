@@ -721,7 +721,7 @@ export default function AdminPage() {
         }),
       };
     });
-  }, [editableLevel, EDITOR_WIDTH, EDITOR_HEIGHT]);
+  }, [editableLevel]); // EDITOR_WIDTH/HEIGHT are constants, not dependencies
 
   const handleEditorTouchEnd = useCallback(() => {
     editorTouchRef.current = null;
