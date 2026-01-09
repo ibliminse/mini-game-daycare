@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --corporate-blue: #4A90D9;
+  --corporate-green: #7BC67E;
+  --corporate-yellow: #FFD93D;
+  --corporate-pink: #FF9EAA;
+  --corporate-purple: #B19CD9;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Courier New', monospace;
+  background: linear-gradient(135deg, #E8F4FD 0%, #FFF5E6 100%);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+@layer utilities {
+  .pixel-border {
+    box-shadow:
+      -4px 0 0 0 #333,
+      4px 0 0 0 #333,
+      0 -4px 0 0 #333,
+      0 4px 0 0 #333;
+  }
+
+  .pixel-text {
+    font-family: 'Courier New', monospace;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    letter-spacing: 1px;
+  }
+
+  .cheerful-pulse {
+    animation: cheerfulPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes cheerfulPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+  }
+
+  .warning-flash {
+    animation: warningFlash 0.5s ease-in-out infinite;
+  }
+
+  @keyframes warningFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+}
