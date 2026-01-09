@@ -408,6 +408,9 @@ export function createInitialState(
     upgrades,
     sprintTimer: 0,
     noIceTimer: 0,
+    // ICE spawn timing
+    timeSinceIceSpawn: 0,
+    nextIceSpawnTime: ICE_AGENT.spawnInterval + Math.random() * 5,
   };
 }
 

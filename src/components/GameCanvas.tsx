@@ -27,6 +27,37 @@ export default function GameCanvas() {
   // Persistent state across games
   const [persistentUpgrades, setPersistentUpgrades] = useState<Upgrades>({ carryCapacity: 0 });
   const [persistentFunding, setPersistentFunding] = useState<number>(0);
+  const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
+
+  // Load progress from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedProgress = localStorage.getItem('qlearn_progress');
+      if (savedProgress) {
+        const progress = JSON.parse(savedProgress);
+        if (progress.upgrades) setPersistentUpgrades(progress.upgrades);
+        if (progress.funding !== undefined) setPersistentFunding(progress.funding);
+        if (progress.level !== undefined) setCurrentLevel(progress.level);
+      }
+    } catch {
+      // If parsing fails, use defaults
+    }
+    setIsProgressLoaded(true);
+  }, []);
+
+  // Save progress to localStorage when it changes
+  useEffect(() => {
+    if (!isProgressLoaded) return; // Don't save until we've loaded
+    try {
+      localStorage.setItem('qlearn_progress', JSON.stringify({
+        upgrades: persistentUpgrades,
+        funding: persistentFunding,
+        level: currentLevel,
+      }));
+    } catch {
+      // If saving fails, ignore
+    }
+  }, [persistentUpgrades, persistentFunding, currentLevel, isProgressLoaded]);
 
   // Start game at current progression level
   const handleStart = useCallback(() => {
@@ -67,6 +98,19 @@ export default function GameCanvas() {
     gameStateRef.current.phase = 'menu';
     setDisplayState({ ...gameStateRef.current });
   }, [persistentUpgrades, currentLevel]);
+
+  // Reset all progress
+  const handleResetProgress = useCallback(() => {
+    if (confirm('Reset all progress? This will erase your upgrades, funding, and level progress.')) {
+      localStorage.removeItem('qlearn_progress');
+      setPersistentUpgrades({ carryCapacity: 0 });
+      setPersistentFunding(0);
+      setCurrentLevel(0);
+      gameStateRef.current = createInitialState(0);
+      gameStateRef.current.phase = 'menu';
+      setDisplayState({ ...gameStateRef.current });
+    }
+  }, []);
 
   // Buy carry capacity upgrade (works in menu and during gameplay)
   const handleBuyCapacity = useCallback(() => {
@@ -223,7 +267,9 @@ export default function GameCanvas() {
 
   return (
     <div className="relative w-screen h-screen flex items-center justify-center overflow-hidden select-none"
-         style={{ backgroundColor: '#1a1a2e' }}>
+         style={{ backgroundColor: '#1a1a2e' }}
+         role="application"
+         aria-label="Q-Learn Daycare Simulator Game">
       <div
         className="relative w-full h-full max-w-[1000px] max-h-[600px]"
         style={{ aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}` }}
@@ -237,12 +283,17 @@ export default function GameCanvas() {
           height={MAP_HEIGHT}
           className="absolute inset-0 w-full h-full"
           style={{ imageRendering: 'pixelated' }}
+          aria-label="Game canvas - use arrow keys or WASD to move"
+          tabIndex={0}
         />
 
         {/* Menu - Somali Daycare Style */}
         {displayState.phase === 'menu' && (
           <div className="absolute inset-0 flex items-center justify-center overflow-auto py-4"
-               style={{ backgroundColor: COLORS.classroomFloor }}>
+               style={{ backgroundColor: COLORS.classroomFloor }}
+               role="dialog"
+               aria-label="Main menu"
+               aria-modal="true">
             {/* Bulletin board background */}
             <div className="relative p-4 rounded-lg shadow-2xl"
                  style={{
@@ -337,6 +388,7 @@ export default function GameCanvas() {
                       : 'bg-white/30 text-white/60 cursor-not-allowed'
                   }`}
                   style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                  aria-label={`Buy plus one carry capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Currently ${CARRY_CAPACITY + persistentUpgrades.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
                 >
                   +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
                 </button>
@@ -350,6 +402,7 @@ export default function GameCanvas() {
                   backgroundColor: COLORS.uiBlue,
                   border: '3px solid #3070b8'
                 }}
+                aria-label={`Start game at level ${currentLevel + 1}: ${LEVELS[currentLevel]?.name || 'Unknown'}`}
               >
                 ▶ START SHIFT
               </button>
@@ -362,6 +415,16 @@ export default function GameCanvas() {
               <p className="mt-1 text-[9px] text-center opacity-70" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
                 &quot;They can deport people, but they can&apos;t deport community&quot;
               </p>
+
+              {/* Reset progress button */}
+              <button
+                onClick={handleResetProgress}
+                className="mt-3 text-[10px] text-center opacity-50 hover:opacity-100 transition-opacity underline"
+                style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}
+                aria-label="Reset all game progress including upgrades, funding, and level progression"
+              >
+                Reset Progress
+              </button>
             </div>
           </div>
         )}
@@ -370,9 +433,9 @@ export default function GameCanvas() {
         {displayState.phase === 'playing' && (
           <>
             {/* Top bar - Level name and stats */}
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-1">
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-1" role="status" aria-live="polite">
               {/* Left side stats */}
-              <div className="flex gap-1 flex-wrap pointer-events-none">
+              <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVELS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
                   {LEVELS[displayState.level]?.name || 'Unknown'}
@@ -405,18 +468,25 @@ export default function GameCanvas() {
                 <button
                   onClick={() => setIsPaused(true)}
                   className="px-2 py-0.5 text-xs font-bold rounded hover:scale-105 transition-transform"
-                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}
+                  aria-label="Pause game">
                   PAUSE
                 </button>
                 <div className="px-2 py-0.5 text-sm font-bold rounded pointer-events-none"
-                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}>
+                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}
+                     aria-label={`Time remaining: ${Math.ceil(displayState.timeRemaining)} seconds`}>
                   {Math.ceil(displayState.timeRemaining)}s
                 </div>
               </div>
             </div>
 
             {/* Suspicion meter - horizontal bar at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 p-1 pointer-events-none">
+            <div className="absolute bottom-0 left-0 right-0 p-1 pointer-events-none"
+                 role="progressbar"
+                 aria-valuenow={Math.floor(displayState.suspicion)}
+                 aria-valuemin={0}
+                 aria-valuemax={100}
+                 aria-label={`Suspicion level: ${Math.floor(displayState.suspicion)} percent. Goal: below ${LOSE_THRESHOLD} percent`}>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
                   Suspicion
@@ -456,7 +526,10 @@ export default function GameCanvas() {
             {/* Pause Menu */}
             {isPaused && !showShop && (
               <div className="absolute inset-0 flex items-center justify-center"
-                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                   role="dialog"
+                   aria-label="Pause menu"
+                   aria-modal="true">
                 <div className="p-4 rounded-lg shadow-2xl"
                      style={{
                        backgroundColor: COLORS.uiPaper,
@@ -477,6 +550,7 @@ export default function GameCanvas() {
                         backgroundColor: COLORS.uiGreen,
                         border: '2px solid #0a8a4d'
                       }}
+                      aria-label="Resume game"
                     >
                       RESUME
                     </button>
@@ -490,6 +564,7 @@ export default function GameCanvas() {
                         color: '#333',
                         border: '2px solid #d4a844'
                       }}
+                      aria-label={`Open shop. You have ${displayState.totalFunding} dollars`}
                     >
                       SHOP (${displayState.totalFunding})
                     </button>
@@ -503,6 +578,7 @@ export default function GameCanvas() {
                         color: '#333',
                         border: '2px solid #999'
                       }}
+                      aria-label="Return to main menu"
                     >
                       MAIN MENU
                     </button>
@@ -514,7 +590,10 @@ export default function GameCanvas() {
             {/* Shop Modal (from pause menu) */}
             {isPaused && showShop && (
               <div className="absolute inset-0 flex items-center justify-center"
-                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
+                   role="dialog"
+                   aria-label="Shop"
+                   aria-modal="true">
                 <div className="p-4 rounded-lg shadow-2xl"
                      style={{
                        backgroundColor: COLORS.uiPaper,
@@ -527,12 +606,13 @@ export default function GameCanvas() {
                       SHOP
                     </h2>
                     <span className="px-2 py-1 rounded font-bold text-white"
-                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}>
+                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}
+                          aria-label={`Available funds: ${displayState.totalFunding} dollars`}>
                       ${displayState.totalFunding}
                     </span>
                   </div>
 
-                  <div className="space-y-2 mb-3">
+                  <div className="space-y-2 mb-3" role="group" aria-label="Available upgrades">
                     {/* Capacity upgrade */}
                     <button
                       onClick={handleBuyCapacity}
@@ -543,6 +623,7 @@ export default function GameCanvas() {
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                       style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                      aria-label={`Buy plus one form capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Current capacity: ${displayState.player.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
                     >
                       +1 Form Capacity (${UPGRADE_COSTS.carryCapacity})
                       <div className="text-xs opacity-80">
@@ -564,6 +645,7 @@ export default function GameCanvas() {
                         backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? COLORS.uiYellow : undefined,
                         color: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? '#333' : undefined
                       }}
+                      aria-label={`Buy sprint power-up for ${UPGRADE_COSTS.sprint} dollars. ${displayState.sprintTimer > 0 ? `Currently active: ${Math.ceil(displayState.sprintTimer)} seconds remaining` : `Gives ${SPRINT_DURATION} seconds of speed boost`}`}
                     >
                       SPRINT (${UPGRADE_COSTS.sprint})
                       <div className="text-xs opacity-80">
@@ -584,6 +666,7 @@ export default function GameCanvas() {
                         fontFamily: 'Comic Sans MS, cursive',
                         backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0 ? COLORS.uiPink : undefined
                       }}
+                      aria-label={`Buy no ICE power-up for ${UPGRADE_COSTS.noIce} dollars. ${displayState.noIceTimer > 0 ? `Currently active: ${Math.ceil(displayState.noIceTimer)} seconds remaining` : `Gives ${NO_ICE_DURATION} seconds of ICE-free time`}`}
                     >
                       NO ICE (${UPGRADE_COSTS.noIce})
                       <div className="text-xs opacity-80">
@@ -600,6 +683,7 @@ export default function GameCanvas() {
                       backgroundColor: COLORS.uiBlue,
                       border: '2px solid #3070b8'
                     }}
+                    aria-label="Go back to pause menu"
                   >
                     BACK
                   </button>
@@ -612,7 +696,10 @@ export default function GameCanvas() {
         {/* End Screen - Construction Paper Style */}
         {(isWin || isLose) && (
           <div className="absolute inset-0 flex items-center justify-center"
-               style={{ backgroundColor: isWin ? 'rgba(29, 209, 161, 0.9)' : 'rgba(255, 107, 107, 0.9)' }}>
+               style={{ backgroundColor: isWin ? 'rgba(29, 209, 161, 0.9)' : 'rgba(255, 107, 107, 0.9)' }}
+               role="dialog"
+               aria-label={isWin ? 'Level complete' : 'Game over'}
+               aria-modal="true">
             <div className="p-6 rounded-lg shadow-2xl max-w-md"
                  style={{
                    backgroundColor: COLORS.uiPaper,
@@ -646,20 +733,20 @@ export default function GameCanvas() {
                   : 'An independent journalist caught you with ICE!'}
               </p>
 
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }}>
+              <div className="grid grid-cols-2 gap-2 mb-4" role="group" aria-label="Level statistics">
+                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }} aria-label={`Enrollments: ${displayState.enrollments}`}>
                   <div className="text-xl font-bold text-white">{displayState.enrollments}</div>
                   <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Enrollments</div>
                 </div>
-                <div className="p-2 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }}>
+                <div className="p-2 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }} aria-label={`Total funding saved: ${displayState.totalFunding} dollars`}>
                   <div className="text-xl font-bold text-gray-800">${displayState.totalFunding}</div>
                   <div className="text-xs text-gray-700" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Total Saved</div>
                 </div>
-                <div className="p-2 text-center rotate-1" style={{ backgroundColor: displayState.suspicion <= LOSE_THRESHOLD ? COLORS.uiGreen : COLORS.uiRed }}>
+                <div className="p-2 text-center rotate-1" style={{ backgroundColor: displayState.suspicion <= LOSE_THRESHOLD ? COLORS.uiGreen : COLORS.uiRed }} aria-label={`Suspicion: ${Math.floor(displayState.suspicion)} percent, ${displayState.suspicion <= LOSE_THRESHOLD ? 'goal met' : 'goal not met'}`}>
                   <div className="text-xl font-bold text-white">{Math.floor(displayState.suspicion)}%</div>
                   <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
                 </div>
-                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }}>
+                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }} aria-label={`Carry capacity: ${CARRY_CAPACITY + persistentUpgrades.carryCapacity}`}>
                   <div className="text-xl font-bold text-white">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
                   <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Carry Cap</div>
                 </div>
@@ -675,6 +762,7 @@ export default function GameCanvas() {
                     backgroundColor: isWin ? COLORS.uiGreen : COLORS.uiRed,
                     border: `3px solid ${isWin ? '#0a8a4d' : '#cc5555'}`
                   }}
+                  aria-label="Retry this level"
                 >
                   RETRY
                 </button>
@@ -687,6 +775,7 @@ export default function GameCanvas() {
                       backgroundColor: COLORS.uiBlue,
                       border: '3px solid #3070b8'
                     }}
+                    aria-label={`Go to next level: ${LEVELS[displayState.level + 1]?.name || 'Unknown'}`}
                   >
                     NEXT →
                   </button>
@@ -701,6 +790,7 @@ export default function GameCanvas() {
                   backgroundColor: '#ddd',
                   border: '2px solid #999'
                 }}
+                aria-label="Return to main menu"
               >
                 MENU
               </button>

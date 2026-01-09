@@ -7,53 +7,12 @@ import { updateGame, resetIceTimer } from '@/game/update';
 import { render } from '@/game/render';
 import { setupKeyboardListeners } from '@/game/input';
 import { GameState, InputState, JoystickState, Building, Room, Door, Form } from '@/game/types';
-
-// Editable room type for the map editor
-interface EditableRoom {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  type: 'hallway' | 'classroom' | 'office';
-}
-
-// Editable level layout
-interface EditableLevel {
-  name: string;
-  rooms: EditableRoom[];
-}
-
-// Editable config type
-interface EditableConfig {
-  inspectionTime: number;
-  playerSpeed: number;
-  carryCapacity: number;
-  maxCarryCapacity: number;
-  formsPerRoom: number;
-  initialSuspicion: number;
-  loseThreshold: number;
-  suspicionReductionPerForm: number;
-  iceSpeed: number;
-  iceDuration: number;
-  iceSpawnInterval: number;
-  iceWarningTime: number;
-  iceVisionDistance: number;
-  iceVisionAngle: number;
-  upgradeCapacityCost: number;
-  upgradeSprintCost: number;
-  upgradeNoIceCost: number;
-  sprintDuration: number;
-  sprintMultiplier: number;
-  noIceDuration: number;
-}
+import { AdminLogin, AdminStatsTab, AdminConfigTab, EditableLevel, EditableRoom, EditableConfig, VALIDATION, EDITOR_WIDTH, EDITOR_HEIGHT } from './components';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'maps' | 'config' | 'stats'>('maps');
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
@@ -106,6 +65,69 @@ export default function AdminPage() {
   const updateConfig = (key: keyof EditableConfig, value: number) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
+
+
+  // Validate and update room property
+  const updateRoomProperty = useCallback((roomId: string, key: string, value: string | number) => {
+    setEditableLevel(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        rooms: prev.rooms.map(r => {
+          if (r.id !== roomId) return r;
+
+          // Validate based on property type
+          if (key === 'name') {
+            const nameValue = String(value).slice(0, VALIDATION.MAX_NAME_LENGTH);
+            return nameValue.length >= VALIDATION.MIN_NAME_LENGTH ? { ...r, name: nameValue } : r;
+          }
+
+          const numValue = Number(value);
+          if (isNaN(numValue)) return r;
+
+          switch (key) {
+            case 'x':
+              return { ...r, x: Math.max(VALIDATION.MIN_POSITION, Math.min(VALIDATION.MAX_X - r.width, numValue)) };
+            case 'y':
+              return { ...r, y: Math.max(VALIDATION.MIN_POSITION, Math.min(VALIDATION.MAX_Y - r.height, numValue)) };
+            case 'width':
+              return { ...r, width: Math.max(VALIDATION.MIN_ROOM_SIZE, Math.min(VALIDATION.MAX_ROOM_SIZE, numValue)) };
+            case 'height':
+              return { ...r, height: Math.max(VALIDATION.MIN_ROOM_SIZE, Math.min(VALIDATION.MAX_ROOM_SIZE, numValue)) };
+            default:
+              return r;
+          }
+        }),
+      };
+    });
+  }, []);
+
+  // Check for existing auth token on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const savedToken = localStorage.getItem('adminToken');
+      if (savedToken) {
+        try {
+          const response = await fetch('/api/auth/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: savedToken }),
+          });
+          const data = await response.json();
+          if (data.valid) {
+            setAuthToken(savedToken);
+            setIsLoggedIn(true);
+          } else {
+            localStorage.removeItem('adminToken');
+          }
+        } catch {
+          localStorage.removeItem('adminToken');
+        }
+      }
+      setIsCheckingAuth(false);
+    };
+    checkAuth();
+  }, []);
 
   // Convert a LEVELS entry to editable format
   const levelToEditable = useCallback((levelIndex: number): EditableLevel => {
@@ -331,10 +353,6 @@ export default function AdminPage() {
     };
   }, []);
 
-  // Editor canvas size (larger than game canvas for more editing room)
-  const EDITOR_WIDTH = 1400;
-  const EDITOR_HEIGHT = 900;
-
   // Get SVG coordinates from mouse event
   const getSvgCoords = useCallback((e: React.MouseEvent) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -468,22 +486,46 @@ export default function AdminPage() {
     }
   }, [selectedLevel, editableLevel, levelToEditable]);
 
+  // Load saved level from localStorage or use default
+  const loadLevelFromStorage = useCallback((index: number): EditableLevel => {
+    try {
+      const saved = localStorage.getItem(`qlearn_level_${index}`);
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // If parsing fails, use default
+    }
+    return levelToEditable(index);
+  }, [levelToEditable]);
+
+  // Save level to localStorage
+  const saveLevelToStorage = useCallback((index: number, level: EditableLevel) => {
+    try {
+      localStorage.setItem(`qlearn_level_${index}`, JSON.stringify(level));
+    } catch {
+      console.error('Failed to save level to localStorage');
+    }
+  }, []);
+
+  // Clear saved level and reset to default
+  const resetLevelToDefault = useCallback((index: number) => {
+    localStorage.removeItem(`qlearn_level_${index}`);
+    setEditableLevel(levelToEditable(index));
+  }, [levelToEditable]);
+
   // Reset editable level when changing selected level
   const handleSelectLevel = useCallback((index: number) => {
     setSelectedLevel(index);
-    setEditableLevel(levelToEditable(index));
+    setEditableLevel(loadLevelFromStorage(index));
     setSelectedRoom(null);
     setIsEditMode(false);
-  }, [levelToEditable]);
+  }, [loadLevelFromStorage]);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username === 'DW' && password === 'daycare') {
-      setIsLoggedIn(true);
-      setError('');
-    } else {
-      setError('Invalid credentials');
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('adminToken');
+    setAuthToken(null);
+    setIsLoggedIn(false);
   };
 
   // Start play test (uses editable level if available)
@@ -529,6 +571,8 @@ export default function AdminPage() {
         upgrades: { carryCapacity: 0 },
         sprintTimer: 0,
         noIceTimer: 0,
+        timeSinceIceSpawn: 0,
+        nextIceSpawnTime: config.iceSpawnInterval + Math.random() * 5,
       };
     } else {
       const { createInitialState } = require('@/game/init');
@@ -683,57 +727,24 @@ export default function AdminPage() {
     editorTouchRef.current = null;
   }, []);
 
-  if (!isLoggedIn) {
+  // Show loading screen while checking auth
+  if (isCheckingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1a1a2e' }}>
-        <div className="p-8 rounded-lg shadow-2xl" style={{ backgroundColor: COLORS.uiPaper, width: '320px' }}>
-          <h1 className="text-2xl font-bold text-center mb-6" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-            Q-Learn™ Admin
-          </h1>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-bold mb-1" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-                Username
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="w-full p-2 border-2 rounded"
-                style={{ borderColor: COLORS.uiBlue }}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full p-2 border-2 rounded"
-                style={{ borderColor: COLORS.uiBlue }}
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-center" style={{ color: COLORS.uiRed, fontFamily: 'Comic Sans MS, cursive' }}>
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
-              style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}
-            >
-              Login
-            </button>
-          </form>
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-t-transparent rounded-full mx-auto mb-4" style={{ borderColor: COLORS.uiBlue, borderTopColor: 'transparent' }}></div>
+          <p style={{ color: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive' }}>Checking authentication...</p>
         </div>
       </div>
+    );
+  }
+
+  if (!isLoggedIn) {
+    return (
+      <AdminLogin onLogin={(token) => {
+        setAuthToken(token);
+        setIsLoggedIn(true);
+      }} />
     );
   }
 
@@ -922,23 +933,24 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: '#1a1a2e' }}>
+    <div className="min-h-screen" style={{ backgroundColor: '#1a1a2e' }} role="main" aria-label="Admin dashboard">
       {/* Header */}
-      <div className="p-2 sm:p-4 flex justify-between items-center" style={{ backgroundColor: COLORS.uiBlue }}>
+      <header className="p-2 sm:p-4 flex justify-between items-center" style={{ backgroundColor: COLORS.uiBlue }}>
         <h1 className="text-base sm:text-xl font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
           Q-Learn™ Admin
         </h1>
         <button
-          onClick={() => setIsLoggedIn(false)}
+          onClick={handleLogout}
           className="px-2 sm:px-4 py-1 bg-white/20 text-white rounded active:bg-white/30 transition-colors text-xs sm:text-base"
           style={{ fontFamily: 'Comic Sans MS, cursive' }}
+          aria-label="Log out of admin panel"
         >
           Logout
         </button>
-      </div>
+      </header>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1.5 sm:p-2" style={{ backgroundColor: COLORS.bulletinBoard }}>
+      <nav className="flex gap-1 p-1.5 sm:p-2" style={{ backgroundColor: COLORS.bulletinBoard }} role="tablist" aria-label="Admin sections">
         {(['maps', 'config', 'stats'] as const).map((tab) => (
           <button
             key={tab}
@@ -950,17 +962,21 @@ export default function AdminPage() {
               fontFamily: 'Comic Sans MS, cursive',
               backgroundColor: activeTab === tab ? COLORS.uiBlue : undefined
             }}
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`${tab}-panel`}
           >
             {tab === 'maps' ? '🗺️' : tab === 'config' ? '⚙️' : '📊'}
             <span className="hidden sm:inline"> {tab === 'maps' ? 'Maps' : tab === 'config' ? 'Config' : 'Stats'}</span>
           </button>
         ))}
-      </div>
+      </nav>
 
       {/* Content */}
       <div className="p-2 sm:p-4">
         {/* Maps Tab */}
         {activeTab === 'maps' && (
+          <section id="maps-panel" role="tabpanel" aria-labelledby="maps-tab">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Level List */}
             <div className="p-3 sm:p-4 rounded-lg lg:w-1/3 lg:min-w-[280px]" style={{ backgroundColor: COLORS.uiPaper }}>
@@ -1013,7 +1029,23 @@ export default function AdminPage() {
                         {isEditMode ? '✓ Done' : '✏️ Edit'}
                       </button>
                       <button
-                        onClick={() => handleSelectLevel(selectedLevel)}
+                        onClick={() => {
+                          if (editableLevel) {
+                            saveLevelToStorage(selectedLevel, editableLevel);
+                            alert('Level saved!');
+                          }
+                        }}
+                        className="px-2 sm:px-3 py-1.5 sm:py-2 font-bold rounded active:scale-95 transition-transform text-xs sm:text-sm text-white"
+                        style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}
+                      >
+                        💾 Save
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm('Reset level to default? This will discard your saved changes.')) {
+                            resetLevelToDefault(selectedLevel);
+                          }
+                        }}
                         className="px-2 sm:px-3 py-1.5 sm:py-2 font-bold rounded active:scale-95 transition-transform text-xs sm:text-sm"
                         style={{ backgroundColor: '#ddd', fontFamily: 'Comic Sans MS, cursive' }}
                       >
@@ -1191,7 +1223,8 @@ export default function AdminPage() {
                           <input
                             type="text"
                             value={editableLevel.rooms.find(r => r.id === selectedRoom)?.name || ''}
-                            onChange={(e) => setEditableLevel(prev => prev ? { ...prev, rooms: prev.rooms.map(r => r.id === selectedRoom ? { ...r, name: e.target.value } : r) } : prev)}
+                            onChange={(e) => updateRoomProperty(selectedRoom, 'name', e.target.value)}
+                            maxLength={30}
                             className="w-full p-1 border rounded text-xs"
                           />
                         </div>
@@ -1199,8 +1232,10 @@ export default function AdminPage() {
                           <label className="block font-bold mb-1">X</label>
                           <input
                             type="number"
+                            min={0}
+                            max={VALIDATION.MAX_X}
                             value={editableLevel.rooms.find(r => r.id === selectedRoom)?.x || 0}
-                            onChange={(e) => setEditableLevel(prev => prev ? { ...prev, rooms: prev.rooms.map(r => r.id === selectedRoom ? { ...r, x: Number(e.target.value) } : r) } : prev)}
+                            onChange={(e) => updateRoomProperty(selectedRoom, 'x', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
                           />
                         </div>
@@ -1208,8 +1243,10 @@ export default function AdminPage() {
                           <label className="block font-bold mb-1">Y</label>
                           <input
                             type="number"
+                            min={0}
+                            max={VALIDATION.MAX_Y}
                             value={editableLevel.rooms.find(r => r.id === selectedRoom)?.y || 0}
-                            onChange={(e) => setEditableLevel(prev => prev ? { ...prev, rooms: prev.rooms.map(r => r.id === selectedRoom ? { ...r, y: Number(e.target.value) } : r) } : prev)}
+                            onChange={(e) => updateRoomProperty(selectedRoom, 'y', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
                           />
                         </div>
@@ -1217,8 +1254,10 @@ export default function AdminPage() {
                           <label className="block font-bold mb-1">Width</label>
                           <input
                             type="number"
+                            min={VALIDATION.MIN_ROOM_SIZE}
+                            max={VALIDATION.MAX_ROOM_SIZE}
                             value={editableLevel.rooms.find(r => r.id === selectedRoom)?.width || 0}
-                            onChange={(e) => setEditableLevel(prev => prev ? { ...prev, rooms: prev.rooms.map(r => r.id === selectedRoom ? { ...r, width: Number(e.target.value) } : r) } : prev)}
+                            onChange={(e) => updateRoomProperty(selectedRoom, 'width', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
                           />
                         </div>
@@ -1226,8 +1265,10 @@ export default function AdminPage() {
                           <label className="block font-bold mb-1">Height</label>
                           <input
                             type="number"
+                            min={VALIDATION.MIN_ROOM_SIZE}
+                            max={VALIDATION.MAX_ROOM_SIZE}
                             value={editableLevel.rooms.find(r => r.id === selectedRoom)?.height || 0}
-                            onChange={(e) => setEditableLevel(prev => prev ? { ...prev, rooms: prev.rooms.map(r => r.id === selectedRoom ? { ...r, height: Number(e.target.value) } : r) } : prev)}
+                            onChange={(e) => updateRoomProperty(selectedRoom, 'height', e.target.value)}
                             className="w-full p-1 border rounded text-xs"
                           />
                         </div>
@@ -1274,363 +1315,20 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+          </section>
         )}
 
         {/* Config Tab - Editable */}
         {activeTab === 'config' && (
-          <div className="p-4 rounded-lg" style={{ backgroundColor: COLORS.uiPaper }}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-                ⚙️ Game Configuration (Editable)
-              </h2>
-              <button
-                onClick={() => setConfig({
-                  inspectionTime: INSPECTION_TIME,
-                  playerSpeed: PLAYER_SPEED,
-                  carryCapacity: CARRY_CAPACITY,
-                  maxCarryCapacity: MAX_CARRY_CAPACITY,
-                  formsPerRoom: FORMS_PER_ROOM,
-                  initialSuspicion: INITIAL_SUSPICION,
-                  loseThreshold: LOSE_THRESHOLD,
-                  suspicionReductionPerForm: SUSPICION_REDUCTION_PER_FORM,
-                  iceSpeed: ICE_AGENT.speed,
-                  iceDuration: ICE_AGENT.duration,
-                  iceSpawnInterval: ICE_AGENT.spawnInterval,
-                  iceWarningTime: ICE_AGENT.warningTime,
-                  iceVisionDistance: ICE_AGENT.visionDistance,
-                  iceVisionAngle: ICE_AGENT.visionAngle,
-                  upgradeCapacityCost: UPGRADE_COSTS.carryCapacity,
-                  upgradeSprintCost: UPGRADE_COSTS.sprint,
-                  upgradeNoIceCost: UPGRADE_COSTS.noIce,
-                  sprintDuration: SPRINT_DURATION,
-                  sprintMultiplier: SPRINT_SPEED_MULTIPLIER,
-                  noIceDuration: NO_ICE_DURATION,
-                })}
-                className="px-3 py-1 text-sm font-bold rounded hover:scale-105 transition-transform"
-                style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive' }}
-              >
-                Reset to Defaults
-              </button>
-            </div>
-
-            <p className="text-sm mb-4 text-gray-600" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-              Edit values below and use &quot;Play Test&quot; on a level to test your changes. Changes here are temporary for testing.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Timer & Player */}
-              <div className="p-4 rounded-lg border-2" style={{ borderColor: COLORS.uiBlue }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiBlue }}>
-                  ⏱️ Timer & Player
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Inspection Time (seconds)</label>
-                    <input
-                      type="number"
-                      value={config.inspectionTime}
-                      onChange={(e) => updateConfig('inspectionTime', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Player Speed (px/s)</label>
-                    <input
-                      type="number"
-                      value={config.playerSpeed}
-                      onChange={(e) => updateConfig('playerSpeed', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Base Carry Capacity</label>
-                    <input
-                      type="number"
-                      value={config.carryCapacity}
-                      onChange={(e) => updateConfig('carryCapacity', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Max Carry Capacity</label>
-                    <input
-                      type="number"
-                      value={config.maxCarryCapacity}
-                      onChange={(e) => updateConfig('maxCarryCapacity', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Suspicion */}
-              <div className="p-4 rounded-lg border-2" style={{ borderColor: COLORS.uiGreen }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiGreen }}>
-                  👀 Suspicion
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Starting Suspicion (%)</label>
-                    <input
-                      type="number"
-                      value={config.initialSuspicion}
-                      onChange={(e) => updateConfig('initialSuspicion', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Win Threshold (≤%)</label>
-                    <input
-                      type="number"
-                      value={config.loseThreshold}
-                      onChange={(e) => updateConfig('loseThreshold', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Reduction Per Form (%)</label>
-                    <input
-                      type="number"
-                      value={config.suspicionReductionPerForm}
-                      onChange={(e) => updateConfig('suspicionReductionPerForm', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Forms Per Room</label>
-                    <input
-                      type="number"
-                      value={config.formsPerRoom}
-                      onChange={(e) => updateConfig('formsPerRoom', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* ICE Agent */}
-              <div className="p-4 rounded-lg border-2" style={{ borderColor: COLORS.uiRed }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiRed }}>
-                  ❄️ ICE Agent
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Speed (px/s)</label>
-                    <input
-                      type="number"
-                      value={config.iceSpeed}
-                      onChange={(e) => updateConfig('iceSpeed', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Patrol Duration (s)</label>
-                    <input
-                      type="number"
-                      value={config.iceDuration}
-                      onChange={(e) => updateConfig('iceDuration', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Spawn Interval (s)</label>
-                    <input
-                      type="number"
-                      value={config.iceSpawnInterval}
-                      onChange={(e) => updateConfig('iceSpawnInterval', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Warning Time (s)</label>
-                    <input
-                      type="number"
-                      value={config.iceWarningTime}
-                      onChange={(e) => updateConfig('iceWarningTime', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Vision Distance (px)</label>
-                    <input
-                      type="number"
-                      value={config.iceVisionDistance}
-                      onChange={(e) => updateConfig('iceVisionDistance', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Vision Angle (°)</label>
-                    <input
-                      type="number"
-                      value={config.iceVisionAngle}
-                      onChange={(e) => updateConfig('iceVisionAngle', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Upgrades */}
-              <div className="p-4 rounded-lg border-2" style={{ borderColor: COLORS.uiPink }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiPink }}>
-                  💰 Upgrade Costs
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Capacity Cost ($)</label>
-                    <input
-                      type="number"
-                      value={config.upgradeCapacityCost}
-                      onChange={(e) => updateConfig('upgradeCapacityCost', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Sprint Cost ($)</label>
-                    <input
-                      type="number"
-                      value={config.upgradeSprintCost}
-                      onChange={(e) => updateConfig('upgradeSprintCost', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">No ICE Cost ($)</label>
-                    <input
-                      type="number"
-                      value={config.upgradeNoIceCost}
-                      onChange={(e) => updateConfig('upgradeNoIceCost', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Power-ups */}
-              <div className="p-4 rounded-lg border-2" style={{ borderColor: COLORS.uiYellow }}>
-                <h3 className="font-bold mb-3" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-                  ⚡ Power-ups
-                </h3>
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Sprint Duration (s)</label>
-                    <input
-                      type="number"
-                      value={config.sprintDuration}
-                      onChange={(e) => updateConfig('sprintDuration', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Sprint Speed Multiplier</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={config.sprintMultiplier}
-                      onChange={(e) => updateConfig('sprintMultiplier', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold mb-1">No ICE Duration (s)</label>
-                    <input
-                      type="number"
-                      value={config.noIceDuration}
-                      onChange={(e) => updateConfig('noIceDuration', Number(e.target.value))}
-                      className="w-full p-2 border rounded"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Test button */}
-            <div className="mt-6 p-4 rounded-lg" style={{ backgroundColor: COLORS.uiGreen }}>
-              <p className="text-white mb-2" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-                Ready to test? Select a level from the Maps tab and click &quot;Play Test&quot;
-              </p>
-              <button
-                onClick={() => setActiveTab('maps')}
-                className="px-4 py-2 bg-white text-green-700 font-bold rounded hover:scale-105 transition-transform"
-                style={{ fontFamily: 'Comic Sans MS, cursive' }}
-              >
-                Go to Maps →
-              </button>
-            </div>
-          </div>
+          <AdminConfigTab
+            config={config}
+            onConfigChange={updateConfig}
+            onGoToMaps={() => setActiveTab('maps')}
+          />
         )}
 
         {/* Stats Tab */}
-        {activeTab === 'stats' && (
-          <div className="p-4 rounded-lg" style={{ backgroundColor: COLORS.uiPaper }}>
-            <h2 className="text-lg font-bold mb-4" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-              📊 Game Statistics
-            </h2>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: COLORS.uiBlue }}>
-                <div className="text-3xl font-bold text-white">{LEVELS.length}</div>
-                <div className="text-sm text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Total Levels</div>
-              </div>
-              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: COLORS.uiGreen }}>
-                <div className="text-3xl font-bold text-white">
-                  {LEVELS.reduce((sum, l) => sum + l.classrooms.length, 0)}
-                </div>
-                <div className="text-sm text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Total Classrooms</div>
-              </div>
-              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: COLORS.uiYellow }}>
-                <div className="text-3xl font-bold" style={{ color: '#333' }}>
-                  {LEVELS.reduce((sum, l) => sum + l.classrooms.length * FORMS_PER_ROOM, 0)}
-                </div>
-                <div className="text-sm" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>Total Forms</div>
-              </div>
-              <div className="p-4 rounded-lg text-center" style={{ backgroundColor: COLORS.uiPink }}>
-                <div className="text-3xl font-bold text-white">
-                  ${LEVELS.reduce((sum, l) => sum + l.classrooms.length * FORMS_PER_ROOM * 5, 0)}
-                </div>
-                <div className="text-sm text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Max Funding</div>
-              </div>
-            </div>
-
-            <h3 className="font-bold mb-2" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-              Level Breakdown
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-                <thead>
-                  <tr style={{ backgroundColor: COLORS.uiBlue, color: 'white' }}>
-                    <th className="p-2 text-left">Level</th>
-                    <th className="p-2 text-left">Name</th>
-                    <th className="p-2 text-center">Rooms</th>
-                    <th className="p-2 text-center">Forms</th>
-                    <th className="p-2 text-center">Hallways</th>
-                    <th className="p-2 text-center">Max $</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {LEVELS.map((level, i) => (
-                    <tr key={i} className={i % 2 === 0 ? 'bg-gray-100' : 'bg-white'}>
-                      <td className="p-2">{i + 1}</td>
-                      <td className="p-2">{level.name}</td>
-                      <td className="p-2 text-center">{level.classrooms.length}</td>
-                      <td className="p-2 text-center">{level.classrooms.length * FORMS_PER_ROOM}</td>
-                      <td className="p-2 text-center">
-                        {1 +
-                          (('hallway2' in level && level.hallway2) ? 1 : 0) +
-                          (('hallway3' in level && level.hallway3) ? 1 : 0) +
-                          (('hallway4' in level && level.hallway4) ? 1 : 0) +
-                          (('hallway5' in level && level.hallway5) ? 1 : 0)
-                        }
-                      </td>
-                      <td className="p-2 text-center">${level.classrooms.length * FORMS_PER_ROOM * 5}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+        {activeTab === 'stats' && <AdminStatsTab />}
       </div>
     </div>
   );

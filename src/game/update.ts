@@ -17,9 +17,8 @@ import {
   SPRINT_SPEED_MULTIPLIER,
 } from './config';
 
-// Track time since last ICE spawn
-let timeSinceIceSpawn = 0;
-let nextIceSpawnTime = ICE_AGENT.spawnInterval + Math.random() * 5; // First spawn at 15-20 seconds
+// Note: ICE spawn timing is now stored in GameState (timeSinceIceSpawn, nextIceSpawnTime)
+// This makes state management cleaner and more predictable
 
 /**
  * Deep clone game state
@@ -40,6 +39,8 @@ function cloneState(state: GameState): GameState {
     upgrades: { ...state.upgrades },
     sprintTimer: state.sprintTimer,
     noIceTimer: state.noIceTimer,
+    timeSinceIceSpawn: state.timeSinceIceSpawn,
+    nextIceSpawnTime: state.nextIceSpawnTime,
   };
 }
 
@@ -52,27 +53,37 @@ function isPlayerInHallway(state: GameState): boolean {
 }
 
 /**
- * Check if ICE agent can see the player
- * ICE can only see in the direction they're facing
+ * Check if ICE agent can see the player using proper vision cone detection
+ * ICE has a cone-shaped field of view in their facing direction
  */
 function canIceSeePlayer(ice: IceAgent, playerX: number, playerY: number): boolean {
   if (!ice.active) return false;
 
-  // Check if player is roughly at same Y level (in hallway)
-  const yDiff = Math.abs(ice.y - playerY);
-  if (yDiff > 60) return false; // Too far vertically
+  // Calculate distance to player
+  const dx = playerX - ice.x;
+  const dy = playerY - ice.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Check direction
-  const xDiff = playerX - ice.x;
+  // Check if player is within vision distance
+  if (distance > ICE_AGENT.visionDistance) return false;
 
-  if (ice.direction === 'right' && xDiff > 0 && xDiff < ICE_AGENT.visionDistance) {
-    return true;
-  }
-  if (ice.direction === 'left' && xDiff < 0 && Math.abs(xDiff) < ICE_AGENT.visionDistance) {
-    return true;
-  }
+  // Calculate angle to player (in radians)
+  const angleToPlayer = Math.atan2(dy, dx);
 
-  return false;
+  // Calculate ICE facing direction (in radians)
+  // Right = 0, Left = PI
+  const facingAngle = ice.direction === 'right' ? 0 : Math.PI;
+
+  // Calculate angle difference (normalize to -PI to PI)
+  let angleDiff = angleToPlayer - facingAngle;
+  while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+  while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+  // Check if player is within vision cone
+  // visionAngle is total cone width (60 degrees = 30 degrees each side)
+  const halfConeAngle = (ICE_AGENT.visionAngle / 2) * (Math.PI / 180);
+
+  return Math.abs(angleDiff) <= halfConeAngle;
 }
 
 /**
@@ -116,8 +127,7 @@ function updateIceAgent(state: GameState, dt: number): void {
     if (reachedEnd) {
       ice.active = false;
       ice.x = -100;
-      timeSinceIceSpawn = 0;
-      nextIceSpawnTime = ICE_AGENT.spawnInterval + (Math.random() - 0.5) * 5;
+      // Note: spawn timing is now reset in updateGame using state fields
     }
   }
 }
@@ -183,9 +193,9 @@ export function updateGame(
       newState.iceAgent.x = -100;
     }
     newState.iceWarning.active = false;
-    timeSinceIceSpawn = 0;
+    newState.timeSinceIceSpawn = 0;
   } else {
-    timeSinceIceSpawn += dt;
+    newState.timeSinceIceSpawn += dt;
 
     // Warning countdown before ICE spawns
     if (newState.iceWarning.active) {
@@ -195,17 +205,24 @@ export function updateGame(
         newState.iceWarning.active = false;
         newState.iceAgent = spawnIceAgent(newState);
       }
-    } else if (!newState.iceAgent.active && timeSinceIceSpawn >= nextIceSpawnTime) {
+    } else if (!newState.iceAgent.active && newState.timeSinceIceSpawn >= newState.nextIceSpawnTime) {
       // Start warning countdown
       newState.iceWarning.active = true;
       newState.iceWarning.countdown = ICE_AGENT.warningTime;
     }
 
     if (newState.iceAgent.active) {
+      const wasActive = newState.iceAgent.active;
       updateIceAgent(newState, dt);
 
+      // Reset spawn timer if ICE just became inactive
+      if (wasActive && !newState.iceAgent.active) {
+        newState.timeSinceIceSpawn = 0;
+        newState.nextIceSpawnTime = ICE_AGENT.spawnInterval + (Math.random() - 0.5) * 5;
+      }
+
       // Check if ICE sees player in hallway
-      if (isPlayerInHallway(newState) && canIceSeePlayer(newState.iceAgent, newState.player.x, newState.player.y)) {
+      if (newState.iceAgent.active && isPlayerInHallway(newState) && canIceSeePlayer(newState.iceAgent, newState.player.x, newState.player.y)) {
         // Caught! Instant lose - journalist catches you with ICE
         newState.phase = 'lose';
         newState.player.stress = 1;
@@ -294,9 +311,10 @@ function respawnForms(state: GameState): void {
 
 /**
  * Reset ICE spawn timer (call when starting new game)
+ * Note: ICE timing is now part of GameState and initialized in createInitialState.
+ * This function is kept for backwards compatibility but is now a no-op.
  */
 export function resetIceTimer(): void {
-  timeSinceIceSpawn = 0;
-  // Give player 10-20 seconds before first ICE spawn
-  nextIceSpawnTime = 10 + Math.random() * 10;
+  // No-op: ICE timing is now handled in GameState (timeSinceIceSpawn, nextIceSpawnTime)
+  // These values are initialized in createInitialState()
 }

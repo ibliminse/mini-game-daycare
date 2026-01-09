@@ -103,6 +103,9 @@ export interface GameState {
   upgrades: Upgrades;
   sprintTimer: number; // seconds remaining of sprint
   noIceTimer: number; // seconds remaining of no-ICE protection
+  // ICE spawn timing (moved from module-level)
+  timeSinceIceSpawn: number;
+  nextIceSpawnTime: number;
 }
 
 export interface InputState {
