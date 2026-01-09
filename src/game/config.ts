@@ -18,40 +18,55 @@ export const PICKUP_DISTANCE = 20;
 export const WALL_THICKNESS = 8;
 
 // Scoring
-export const FUNDING_PER_FORM = 1;
+export const FUNDING_PER_FORM = 5; // money per form for upgrades
 export const ENROLLMENT_PER_FORM = 1;
-export const SUSPICION_PER_FORM = 1;
-export const CAPACITY_BONUS_SUSPICION = 3;
+export const SUSPICION_REDUCTION_PER_FORM = 8; // how much suspicion decreases per form
+export const CAPACITY_BONUS_REDUCTION = 3; // extra reduction for full stack
 
-// Suspicion
-export const PASSIVE_SUSPICION_RATE = 0.25; // per second (slightly slower for bigger map)
+// Suspicion (starts at 100, need to get below 25 to win)
+export const INITIAL_SUSPICION = 100;
+export const LOSE_THRESHOLD = 25; // if above this at end, you lose
+export const PASSIVE_SUSPICION_RATE = 0.8; // suspicion creeps up per second (faster)
 export const MAX_SUSPICION = 100;
-export const WARNING_THRESHOLD = 70;
+export const WARNING_THRESHOLD = 50; // warning when above this
+
+// Upgrades
+export const UPGRADE_COSTS = {
+  carryCapacity: 45, // cost per extra slot
+  sprint: 20, // speed boost
+  noIce: 50, // 30 seconds no ICE
+};
+export const MAX_CARRY_CAPACITY = 10;
+export const SPRINT_DURATION = 13; // seconds
+export const SPRINT_SPEED_MULTIPLIER = 1.8;
+export const NO_ICE_DURATION = 30; // seconds
 
 // Timer
-export const INSPECTION_TIME = 90; // more time for bigger map
+export const INSPECTION_TIME = 45; // 45 seconds per level
 
-// Preschool Chaos Color Palette
+// Somali Daycare Color Palette
+// Somali flag: Light blue (#4189DD) and white
 export const COLORS = {
   // Floors
   hallwayFloor: '#f4e4bc',      // Beige linoleum
-  classroomFloor: '#a8d5a2',    // Green carpet (like grass)
+  classroomFloor: '#b8d4e8',    // Light blue carpet (Somali theme)
   officeFloor: '#d4c4a8',       // Tan tile
 
   // Walls
-  wall: '#ff6b6b',              // Bright coral/red walls
-  wallTrim: '#ee5a5a',          // Slightly darker trim
+  wall: '#4189DD',              // Somali blue walls
+  wallTrim: '#3070b8',          // Darker blue trim
 
-  // Player (stressed adult)
-  playerShirt: '#4a90d9',       // Blue polo shirt
+  // Player (stressed Somali adult)
+  playerShirt: '#1a5c2e',       // Green shirt
   playerPants: '#2d2d2d',       // Dark pants
-  playerSkin: '#f5d0c5',        // Skin tone
-  playerHair: '#4a3728',        // Brown hair
+  playerSkin: '#8d5524',        // Somali skin tone
+  playerHair: '#1a1a1a',        // Black hair
+  playerHijab: '#9b59b6',       // Optional hijab color
   playerSweat: '#7ec8e3',       // Sweat drops
 
   // Forms (kid drawings)
   formPaper: '#fff',            // White paper
-  formCrayon: ['#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#ff9ff3'], // Crayon colors
+  formCrayon: ['#4189DD', '#1dd1a1', '#feca57', '#ff6b6b', '#9b59b6'], // Crayon colors
 
   // Desk (messy office)
   desk: '#8b6914',              // Wood desk
@@ -60,46 +75,195 @@ export const COLORS = {
 
   // Decorations
   bulletinBoard: '#cd853f',     // Cork board brown
-  constructionPaper: ['#ff6b6b', '#feca57', '#48dbfb', '#1dd1a1', '#ff9ff3', '#a55eea'],
+  constructionPaper: ['#4189DD', '#feca57', '#1dd1a1', '#ff6b6b', '#9b59b6', '#fff'],
+
+  // ICE Agent
+  iceShirt: '#1a3a1a',          // Dark green uniform
+  icePants: '#0d1f0d',          // Very dark green
+  iceSkin: '#f5d0c5',           // Skin tone
+  iceVest: '#2d2d2d',           // Black vest
+  iceText: '#ffd700',           // "ICE" text color
+
+  // Posters
+  posterRed: '#c0392b',
+  posterWhite: '#fff',
 
   // UI
   uiPaper: '#fffef0',           // Slightly off-white
   uiCrayon: '#2d3436',          // Dark crayon for text
-  uiRed: '#ff6b6b',
+  uiRed: '#c0392b',
   uiYellow: '#feca57',
-  uiBlue: '#48dbfb',
+  uiBlue: '#4189DD',            // Somali blue
   uiGreen: '#1dd1a1',
-  uiPink: '#ff9ff3',
+  uiPink: '#9b59b6',
 };
 
-// Building Layout - rooms connect directly to hallway (no gap)
-export const BUILDING = {
-  hallway: {
-    x: 100,
-    y: 250,
-    width: 800,
-    height: 100,
-  },
-  classrooms: [
-    // Top rooms - bottom edge touches hallway top
-    { id: 'room-a', name: 'Room A', x: 100, y: 50, width: 180, height: 200 },
-    { id: 'room-b', name: 'Room B', x: 320, y: 50, width: 180, height: 200 },
-    { id: 'room-c', name: 'Room C', x: 540, y: 50, width: 180, height: 200 },
-    // Bottom rooms - top edge touches hallway bottom (y = 250 + 100 = 350)
-    { id: 'room-d', name: 'Room D', x: 100, y: 350, width: 180, height: 200 },
-    { id: 'room-e', name: 'Room E', x: 320, y: 350, width: 180, height: 200 },
-  ],
-  office: {
-    id: 'office',
-    name: 'Office',
-    x: 760,
-    y: 350,
-    width: 180,
-    height: 200,
-  },
+// ICE Agent settings
+export const ICE_AGENT = {
+  speed: 120, // pixels per second
+  duration: 12, // seconds active (longer patrol)
+  spawnInterval: 20, // seconds between spawns
+  warningTime: 3, // seconds warning before ICE appears
+  visionDistance: 200, // how far they can see (wider)
+  visionAngle: 60, // degrees field of view (30 each side)
 };
 
-// Desk location (inside office)
+// Level Layouts - All fit within 1000x600 canvas
+// Each room must be adjacent to a hallway (within 30px gap)
+export const LEVELS = [
+  // Level 1: Simple straight hallway - 2 classrooms (tutorial)
+  {
+    name: 'Iftin Academy',
+    hallway: { x: 100, y: 260, width: 600, height: 80 },
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 100, y: 50, width: 250, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 400, y: 50, width: 250, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 400, y: 340, width: 250, height: 210 },
+  },
+  // Level 2: Longer hallway - 3 classrooms
+  {
+    name: 'Barwaaqo Center',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 220, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 300, y: 50, width: 220, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 50, y: 340, width: 220, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 730, y: 340, width: 220, height: 210 },
+  },
+  // Level 3: L-shaped hallway - 4 classrooms
+  {
+    name: 'Nabad Academy',
+    hallway: { x: 50, y: 260, width: 700, height: 80 },
+    hallway2: { x: 670, y: 260, width: 80, height: 290 },
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 200, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 510, y: 50, width: 200, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 50, y: 340, width: 200, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 300, y: 340, width: 200, height: 210 },
+  },
+  // Level 4: L-shaped with 4 classrooms
+  // Based on working Level 3 pattern - hallways MUST overlap at junction
+  {
+    name: 'Hodan Daycare',
+    hallway: { x: 50, y: 260, width: 700, height: 80 },      // Main horizontal (same as L3)
+    hallway2: { x: 670, y: 260, width: 80, height: 290 },    // Vertical down (overlaps at x=670-750)
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },   // bottom=260=hallway.y
+      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 200, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 510, y: 50, width: 200, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 50, y: 340, width: 200, height: 210 },  // top=340=hallway.y+80
+    ],
+    office: { id: 'office', name: 'Office', x: 750, y: 340, width: 200, height: 210 }, // right of hallway2
+  },
+  // Level 5: T-shaped - 5 classrooms
+  // Main horizontal with vertical branch going up
+  {
+    name: 'Salam Kids',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
+    hallway2: { x: 420, y: 50, width: 80, height: 290 },     // Vertical up (overlaps at y=260-340)
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 180, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 200, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 750, y: 340, width: 200, height: 210 },
+  },
+  // Level 6: L-shaped reversed - 5 classrooms
+  // Hallway goes right then down, office at bottom right
+  {
+    name: 'Hibo Center',
+    hallway: { x: 50, y: 260, width: 600, height: 80 },      // Horizontal left
+    hallway2: { x: 570, y: 260, width: 80, height: 290 },    // Vertical down (overlaps)
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 200, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 510, y: 50, width: 200, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 50, y: 340, width: 200, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 280, y: 340, width: 200, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 650, y: 340, width: 200, height: 210 },
+  },
+  // Level 7: T-shaped with bottom branch - 6 classrooms
+  {
+    name: 'Ayaan Academy',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
+    hallway2: { x: 420, y: 260, width: 80, height: 290 },    // Vertical down (overlaps)
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 180, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 180, height: 210 },
+      { id: 'room-f', name: 'Room F', x: 240, y: 340, width: 180, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 500, y: 340, width: 200, height: 210 },
+  },
+  // Level 8: Double L - 6 classrooms
+  // T-shape with vertical going up
+  {
+    name: 'Deeqa Daycare',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
+    hallway2: { x: 420, y: 50, width: 80, height: 290 },     // Vertical up (overlaps)
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 180, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 200, height: 210 },
+      { id: 'room-f', name: 'Room F', x: 260, y: 340, width: 200, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 700, y: 340, width: 200, height: 210 },
+  },
+  // Level 9: Wide T - 7 classrooms
+  // Main hallway with two vertical branches
+  {
+    name: 'Farah Center',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
+    hallway2: { x: 200, y: 260, width: 80, height: 290 },    // Left branch down
+    hallway3: { x: 650, y: 260, width: 80, height: 290 },    // Right branch down
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 180, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 480, y: 50, width: 180, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 680, y: 50, width: 180, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 150, height: 210 },
+      { id: 'room-f', name: 'Room F', x: 280, y: 340, width: 180, height: 210 },
+      { id: 'room-g', name: 'Room G', x: 730, y: 340, width: 180, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 480, y: 340, width: 170, height: 210 },
+  },
+  // Level 10: H-shaped - 8 classrooms (hardest)
+  // Three vertical segments connected by horizontal
+  {
+    name: 'Warsame Academy',
+    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
+    hallway2: { x: 50, y: 50, width: 80, height: 290 },      // Left vertical (overlaps)
+    hallway3: { x: 420, y: 50, width: 80, height: 290 },     // Center vertical
+    hallway4: { x: 800, y: 50, width: 80, height: 290 },     // Right vertical
+    classrooms: [
+      { id: 'room-a', name: 'Room A', x: 130, y: 50, width: 150, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 290, y: 50, width: 130, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 150, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 660, y: 50, width: 130, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 130, y: 340, width: 150, height: 210 },
+      { id: 'room-f', name: 'Room F', x: 290, y: 340, width: 130, height: 210 },
+      { id: 'room-g', name: 'Room G', x: 500, y: 340, width: 150, height: 210 },
+      { id: 'room-h', name: 'Room H', x: 660, y: 340, width: 130, height: 210 },
+    ],
+    office: { id: 'office', name: 'Office', x: 880, y: 50, width: 70, height: 210 },
+  },
+];
+
+// Current level (for backwards compatibility)
+export const BUILDING = LEVELS[0];
+
+// Desk location (inside office) - calculated dynamically per level
 export const DESK = {
   x: BUILDING.office.x + 40,
   y: BUILDING.office.y + 60,

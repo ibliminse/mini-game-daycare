@@ -6,7 +6,9 @@ import { createInitialState, createInputState, createJoystickState } from '@/gam
 import { updateGame } from '@/game/update';
 import { render } from '@/game/render';
 import { setupKeyboardListeners } from '@/game/input';
-import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS } from '@/game/config';
+import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVELS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION } from '@/game/config';
+import { resetIceTimer } from '@/game/update';
+import { Upgrades } from '@/game/types';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -18,18 +20,107 @@ export default function GameCanvas() {
   const gameTimeRef = useRef<number>(0);
 
   const [displayState, setDisplayState] = useState<GameState>(gameStateRef.current);
+  const [currentLevel, setCurrentLevel] = useState<number>(0); // Player's progression level
+  const [isPaused, setIsPaused] = useState<boolean>(false);
+  const [showShop, setShowShop] = useState<boolean>(false);
 
-  // Start game
+  // Persistent state across games
+  const [persistentUpgrades, setPersistentUpgrades] = useState<Upgrades>({ carryCapacity: 0 });
+  const [persistentFunding, setPersistentFunding] = useState<number>(0);
+
+  // Start game at current progression level
   const handleStart = useCallback(() => {
-    gameStateRef.current = createInitialState();
+    resetIceTimer();
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding);
     gameStateRef.current.phase = 'playing';
+    setDisplayState({ ...gameStateRef.current });
+  }, [currentLevel, persistentUpgrades, persistentFunding]);
+
+  // Restart current level
+  const handleRestart = useCallback(() => {
+    resetIceTimer();
+    const currentLevel = gameStateRef.current.level;
+    // Save accumulated funding before restart
+    setPersistentFunding(gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current.phase = 'playing';
+    setDisplayState({ ...gameStateRef.current });
+  }, [persistentUpgrades]);
+
+  // Advance to next level
+  const handleNextLevel = useCallback(() => {
+    const nextLevel = Math.min(gameStateRef.current.level + 1, LEVELS.length - 1);
+    setCurrentLevel(nextLevel); // Update progression
+    resetIceTimer();
+    // Save accumulated funding
+    setPersistentFunding(gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current.phase = 'playing';
+    setDisplayState({ ...gameStateRef.current });
+  }, [persistentUpgrades]);
+
+  // Go back to menu
+  const handleMenu = useCallback(() => {
+    // Save funding when going to menu
+    setPersistentFunding(gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current.phase = 'menu';
+    setDisplayState({ ...gameStateRef.current });
+  }, [persistentUpgrades, currentLevel]);
+
+  // Buy carry capacity upgrade (works in menu and during gameplay)
+  const handleBuyCapacity = useCallback(() => {
+    const currentCapacity = CARRY_CAPACITY + persistentUpgrades.carryCapacity;
+    if (currentCapacity >= MAX_CARRY_CAPACITY) return;
+
+    // Use game state funding if playing, otherwise persistent funding
+    const availableFunding = gameStateRef.current.phase === 'playing'
+      ? gameStateRef.current.totalFunding
+      : persistentFunding;
+
+    if (availableFunding < UPGRADE_COSTS.carryCapacity) return;
+
+    const newUpgrades = { ...persistentUpgrades, carryCapacity: persistentUpgrades.carryCapacity + 1 };
+    const newFunding = availableFunding - UPGRADE_COSTS.carryCapacity;
+
+    setPersistentUpgrades(newUpgrades);
+    setPersistentFunding(newFunding);
+
+    // Update current game state
+    if (gameStateRef.current.phase === 'menu') {
+      gameStateRef.current = createInitialState(currentLevel, newUpgrades, newFunding);
+      gameStateRef.current.phase = 'menu';
+      setDisplayState({ ...gameStateRef.current });
+    } else if (gameStateRef.current.phase === 'playing') {
+      // Update in-game state
+      gameStateRef.current.totalFunding = newFunding;
+      gameStateRef.current.upgrades = newUpgrades;
+      gameStateRef.current.player.carryCapacity = CARRY_CAPACITY + newUpgrades.carryCapacity;
+      setDisplayState({ ...gameStateRef.current });
+    }
+  }, [persistentUpgrades, persistentFunding, currentLevel]);
+
+  // Buy sprint power-up (only during gameplay)
+  const handleBuySprint = useCallback(() => {
+    if (gameStateRef.current.phase !== 'playing') return;
+    if (gameStateRef.current.totalFunding < UPGRADE_COSTS.sprint) return;
+    if (gameStateRef.current.sprintTimer > 0) return; // Already active
+
+    gameStateRef.current.totalFunding -= UPGRADE_COSTS.sprint;
+    gameStateRef.current.sprintTimer = SPRINT_DURATION;
+    setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
   }, []);
 
-  // Restart game
-  const handleRestart = useCallback(() => {
-    gameStateRef.current = createInitialState();
-    gameStateRef.current.phase = 'playing';
+  // Buy no-ICE power-up (only during gameplay)
+  const handleBuyNoIce = useCallback(() => {
+    if (gameStateRef.current.phase !== 'playing') return;
+    if (gameStateRef.current.totalFunding < UPGRADE_COSTS.noIce) return;
+    if (gameStateRef.current.noIceTimer > 0) return; // Already active
+
+    gameStateRef.current.totalFunding -= UPGRADE_COSTS.noIce;
+    gameStateRef.current.noIceTimer = NO_ICE_DURATION;
+    setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
   }, []);
 
@@ -72,8 +163,8 @@ export default function GameCanvas() {
       lastTimeRef.current = timestamp;
       gameTimeRef.current += deltaTime;
 
-      // Update
-      if (gameStateRef.current.phase === 'playing') {
+      // Update (skip if paused)
+      if (gameStateRef.current.phase === 'playing' && !isPaused) {
         gameStateRef.current = updateGame(
           gameStateRef.current,
           inputStateRef.current,
@@ -96,7 +187,7 @@ export default function GameCanvas() {
     animationFrameRef.current = requestAnimationFrame(gameLoop);
 
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, []);
+  }, [isPaused]);
 
   // Touch joystick handlers
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -132,10 +223,10 @@ export default function GameCanvas() {
 
   return (
     <div className="relative w-screen h-screen flex items-center justify-center overflow-hidden select-none"
-         style={{ backgroundColor: '#2d3436' }}>
+         style={{ backgroundColor: '#1a1a2e' }}>
       <div
-        className="relative"
-        style={{ width: MAP_WIDTH, height: MAP_HEIGHT, maxWidth: '100vw', maxHeight: '100vh' }}
+        className="relative w-full h-full max-w-[1000px] max-h-[600px]"
+        style={{ aspectRatio: `${MAP_WIDTH} / ${MAP_HEIGHT}` }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -144,128 +235,377 @@ export default function GameCanvas() {
           ref={canvasRef}
           width={MAP_WIDTH}
           height={MAP_HEIGHT}
-          className="block"
-          style={{ imageRendering: 'pixelated', width: '100%', height: '100%', objectFit: 'contain' }}
+          className="absolute inset-0 w-full h-full"
+          style={{ imageRendering: 'pixelated' }}
         />
 
-        {/* Menu - Construction Paper Style */}
+        {/* Menu - Somali Daycare Style */}
         {displayState.phase === 'menu' && (
-          <div className="absolute inset-0 flex items-center justify-center"
+          <div className="absolute inset-0 flex items-center justify-center overflow-auto py-4"
                style={{ backgroundColor: COLORS.classroomFloor }}>
             {/* Bulletin board background */}
-            <div className="relative p-8 rounded-lg shadow-2xl"
+            <div className="relative p-4 rounded-lg shadow-2xl"
                  style={{
                    backgroundColor: COLORS.bulletinBoard,
                    border: '8px solid #8b4513',
-                   maxWidth: '420px'
+                   width: '380px'
                  }}>
-              {/* Pushpins */}
-              <div className="absolute -top-2 left-8 w-4 h-4 rounded-full bg-red-500 border-2 border-red-700" />
-              <div className="absolute -top-2 right-8 w-4 h-4 rounded-full bg-blue-500 border-2 border-blue-700" />
+              {/* Pushpins - Somali flag colors */}
+              <div className="absolute -top-2 left-8 w-4 h-4 rounded-full border-2"
+                   style={{ backgroundColor: COLORS.uiBlue, borderColor: '#3070b8' }} />
+              <div className="absolute -top-2 right-8 w-4 h-4 rounded-full bg-white border-2 border-gray-300" />
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
+                   style={{ backgroundColor: COLORS.uiBlue }} />
 
-              {/* Title card */}
-              <div className="text-center p-4 mb-4 -rotate-1"
-                   style={{ backgroundColor: COLORS.uiPaper }}>
-                <h1 className="text-4xl font-bold mb-1"
-                    style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiRed }}>
-                  Q-Learn
+              {/* Title card - Somali flag style */}
+              <div className="text-center p-3 mb-2 -rotate-1 relative overflow-hidden"
+                   style={{ backgroundColor: COLORS.uiBlue }}>
+                {/* White star decoration */}
+                <span className="absolute top-1 right-2 text-white/30 text-lg">★</span>
+                <span className="absolute bottom-1 left-2 text-white/30 text-sm">★</span>
+                <h1 className="text-2xl font-bold text-white"
+                    style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  Q-Learn™
                 </h1>
-                <p className="text-lg" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiBlue }}>
-                  Quality Learning Centers
+                <p className="text-sm text-white/90" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  Somali Daycare Simulator
+                </p>
+                <p className="text-[10px] text-white/70 mt-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  &quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity
                 </p>
               </div>
 
+              {/* Kid drawing decoration */}
+              <div className="absolute -right-2 top-20 rotate-12 text-2xl opacity-60">🖍️</div>
+
               {/* Instructions card */}
-              <div className="p-4 mb-4 rotate-1"
+              <div className="p-2 mb-2 rotate-1"
                    style={{ backgroundColor: COLORS.uiYellow }}>
-                <h2 className="font-bold mb-3 text-center"
+                <h2 className="font-bold mb-1 text-center text-xs"
                     style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-                  How to Play
+                  📋 How to Play
                 </h2>
-                <ul className="space-y-1 text-sm" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
-                  <li>* WASD / Arrows / Touch to move</li>
-                  <li>* Walk into forms to collect them</li>
-                  <li>* Bring forms to the Office desk</li>
-                  <li>* Survive until inspection ends!</li>
-                  <li>* Watch your suspicion meter!</li>
+                <ul className="space-y-0 text-xs leading-tight" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                  <li>• WASD / Arrows / Touch to move</li>
+                  <li>• Collect enrollment forms from classrooms</li>
+                  <li>• Drop forms at the Office desk</li>
+                  <li>• HIDE in rooms when ICE patrols! 🚨</li>
                 </ul>
+              </div>
+
+              {/* Anti-ICE note - looks like a sticky note */}
+              <div className="p-1.5 mb-2 -rotate-2 shadow-md"
+                   style={{ backgroundColor: '#ffb3b3' }}>
+                <p className="text-[10px] text-center font-bold" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#8b0000' }}>
+                  ❄️ ICE agents have NO jurisdiction over love ❄️
+                </p>
+              </div>
+
+              {/* Current Level Display */}
+              <div className="p-2 mb-2 -rotate-1"
+                   style={{ backgroundColor: COLORS.uiBlue }}>
+                <h2 className="font-bold text-center text-white"
+                    style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  🏫 {LEVELS[currentLevel]?.name || 'Unknown'}
+                </h2>
+                <p className="text-xs text-center text-white/80"
+                   style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  Level {currentLevel + 1} of {LEVELS.length}
+                </p>
+              </div>
+
+              {/* Upgrades Section */}
+              <div className="p-2 mb-2 rotate-1"
+                   style={{ backgroundColor: COLORS.uiGreen }}>
+                <div className="flex justify-between items-center mb-1">
+                  <h2 className="font-bold text-xs text-white"
+                      style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                    💰 Upgrades
+                  </h2>
+                  <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-bold text-white"
+                        style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                    ${persistentFunding}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleBuyCapacity}
+                  disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
+                  className={`w-full p-1.5 rounded text-xs font-bold transition-all ${
+                    persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                      ? 'bg-white text-green-700 hover:scale-105'
+                      : 'bg-white/30 text-white/60 cursor-not-allowed'
+                  }`}
+                  style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                >
+                  +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
+                </button>
               </div>
 
               <button
                 onClick={handleStart}
-                className="w-full py-3 text-white text-xl font-bold rounded transform hover:scale-105 transition-all shadow-lg"
+                className="w-full py-3 text-white text-lg font-bold rounded transform hover:scale-105 transition-all shadow-lg"
                 style={{
                   fontFamily: 'Comic Sans MS, cursive',
-                  backgroundColor: COLORS.uiGreen,
-                  border: '3px solid #0a8a4d'
+                  backgroundColor: COLORS.uiBlue,
+                  border: '3px solid #3070b8'
                 }}
               >
-                START!
+                ▶ START SHIFT
               </button>
 
-              <p className="mt-4 text-xs text-center" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
-                Carry up to 3 forms * Each drop increases suspicion
+              <p className="mt-2 text-xs text-center" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
+                Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
+              </p>
+
+              {/* Bottom tagline */}
+              <p className="mt-1 text-[9px] text-center opacity-70" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
+                &quot;They can deport people, but they can&apos;t deport community&quot;
               </p>
             </div>
           </div>
         )}
 
-        {/* HUD - Construction Paper Style */}
+        {/* HUD - Compact overlay */}
         {displayState.phase === 'playing' && (
           <>
-            {/* Top stats - paper strips */}
-            <div className="absolute top-2 left-2 flex gap-2">
-              {/* Enrollments */}
-              <div className="px-3 py-1 -rotate-1"
-                   style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}>
-                <span className="font-bold text-white">{displayState.enrollments}</span>
-                <span className="text-white/80 ml-1 text-sm">enrolled</span>
+            {/* Top bar - Level name and stats */}
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-1">
+              {/* Left side stats */}
+              <div className="flex gap-1 flex-wrap pointer-events-none">
+                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
+                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                  {LEVELS[displayState.level]?.name || 'Unknown'}
+                </div>
+                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
+                     style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}>
+                  ${displayState.totalFunding}
+                </div>
+                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
+                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                  {displayState.player.carrying}/{displayState.player.carryCapacity} forms
+                </div>
+                {/* Active power-ups */}
+                {displayState.sprintTimer > 0 && (
+                  <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
+                       style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                    SPRINT {Math.ceil(displayState.sprintTimer)}s
+                  </div>
+                )}
+                {displayState.noIceTimer > 0 && (
+                  <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
+                       style={{ backgroundColor: COLORS.uiPink, fontFamily: 'Comic Sans MS, cursive' }}>
+                    NO ICE {Math.ceil(displayState.noIceTimer)}s
+                  </div>
+                )}
               </div>
 
-              {/* Funding */}
-              <div className="px-3 py-1 rotate-1"
-                   style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive' }}>
-                <span className="font-bold text-gray-800">${displayState.funding}</span>
-                <span className="text-gray-700 ml-1 text-sm">funding</span>
-              </div>
-
-              {/* Forms carried */}
-              <div className="px-3 py-1 -rotate-1"
-                   style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-                <span className="font-bold text-white">{displayState.player.carrying}/{displayState.player.carryCapacity}</span>
-                <span className="text-white/80 ml-1 text-sm">forms</span>
+              {/* Right side - Timer and Pause */}
+              <div className="flex gap-1 items-center">
+                <button
+                  onClick={() => setIsPaused(true)}
+                  className="px-2 py-0.5 text-xs font-bold rounded hover:scale-105 transition-transform"
+                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                  PAUSE
+                </button>
+                <div className="px-2 py-0.5 text-sm font-bold rounded pointer-events-none"
+                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}>
+                  {Math.ceil(displayState.timeRemaining)}s
+                </div>
               </div>
             </div>
 
-            {/* Timer */}
-            <div className="absolute top-2 right-14 px-3 py-1"
-                 style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive' }}>
-              <span className="font-bold text-xl" style={{ color: COLORS.uiCrayon }}>
-                {Math.ceil(displayState.timeRemaining)}s
-              </span>
-            </div>
-
-            {/* Suspicion meter - crayon thermometer style */}
-            <div className="absolute top-12 right-2 w-8 h-44 rounded-full overflow-hidden border-4"
-                 style={{ backgroundColor: COLORS.uiPaper, borderColor: COLORS.uiCrayon }}>
-              <div
-                className="absolute bottom-0 left-0 right-0 transition-all duration-300"
-                style={{
-                  height: `${suspicionPercent}%`,
-                  backgroundColor: suspicionPercent > WARNING_THRESHOLD
-                    ? COLORS.uiRed
-                    : suspicionPercent > 50
-                      ? COLORS.uiYellow
-                      : COLORS.uiGreen,
-                }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-bold text-xs [writing-mode:vertical-rl] rotate-180"
-                      style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}>
-                  {Math.floor(displayState.suspicion)}%
+            {/* Suspicion meter - horizontal bar at bottom */}
+            <div className="absolute bottom-0 left-0 right-0 p-1 pointer-events-none">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                  Suspicion
                 </span>
+                <div className="flex-1 h-4 rounded overflow-hidden border-2 relative"
+                     style={{ backgroundColor: COLORS.uiPaper, borderColor: COLORS.uiCrayon }}>
+                  {/* Fill */}
+                  <div
+                    className="absolute top-0 left-0 bottom-0 transition-all duration-300"
+                    style={{
+                      width: `${suspicionPercent}%`,
+                      backgroundColor: suspicionPercent > WARNING_THRESHOLD
+                        ? COLORS.uiRed
+                        : suspicionPercent > LOSE_THRESHOLD
+                          ? COLORS.uiYellow
+                          : COLORS.uiGreen,
+                    }}
+                  />
+                  {/* Threshold line at 25% */}
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5"
+                    style={{
+                      left: `${LOSE_THRESHOLD}%`,
+                      backgroundColor: '#000',
+                    }}
+                  />
+                  {/* Percentage text */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs font-bold" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                      {Math.floor(displayState.suspicion)}% (goal: ≤{LOSE_THRESHOLD}%)
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {/* Pause Menu */}
+            {isPaused && !showShop && (
+              <div className="absolute inset-0 flex items-center justify-center"
+                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+                <div className="p-4 rounded-lg shadow-2xl"
+                     style={{
+                       backgroundColor: COLORS.uiPaper,
+                       border: `4px solid ${COLORS.uiBlue}`,
+                       width: '280px'
+                     }}>
+                  <h2 className="text-xl font-bold text-center mb-4"
+                      style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiBlue }}>
+                    PAUSED
+                  </h2>
+
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setIsPaused(false)}
+                      className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
+                      style={{
+                        fontFamily: 'Comic Sans MS, cursive',
+                        backgroundColor: COLORS.uiGreen,
+                        border: '2px solid #0a8a4d'
+                      }}
+                    >
+                      RESUME
+                    </button>
+
+                    <button
+                      onClick={() => setShowShop(true)}
+                      className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
+                      style={{
+                        fontFamily: 'Comic Sans MS, cursive',
+                        backgroundColor: COLORS.uiYellow,
+                        color: '#333',
+                        border: '2px solid #d4a844'
+                      }}
+                    >
+                      SHOP (${displayState.totalFunding})
+                    </button>
+
+                    <button
+                      onClick={() => { setIsPaused(false); handleMenu(); }}
+                      className="w-full py-2 font-bold rounded hover:scale-105 transition-transform"
+                      style={{
+                        fontFamily: 'Comic Sans MS, cursive',
+                        backgroundColor: '#ddd',
+                        color: '#333',
+                        border: '2px solid #999'
+                      }}
+                    >
+                      MAIN MENU
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Shop Modal (from pause menu) */}
+            {isPaused && showShop && (
+              <div className="absolute inset-0 flex items-center justify-center"
+                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+                <div className="p-4 rounded-lg shadow-2xl"
+                     style={{
+                       backgroundColor: COLORS.uiPaper,
+                       border: `4px solid ${COLORS.uiGreen}`,
+                       width: '300px'
+                     }}>
+                  <div className="flex justify-between items-center mb-3">
+                    <h2 className="text-lg font-bold"
+                        style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiGreen }}>
+                      SHOP
+                    </h2>
+                    <span className="px-2 py-1 rounded font-bold text-white"
+                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}>
+                      ${displayState.totalFunding}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2 mb-3">
+                    {/* Capacity upgrade */}
+                    <button
+                      onClick={handleBuyCapacity}
+                      disabled={displayState.totalFunding < UPGRADE_COSTS.carryCapacity || displayState.player.carryCapacity >= MAX_CARRY_CAPACITY}
+                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
+                        displayState.totalFunding >= UPGRADE_COSTS.carryCapacity && displayState.player.carryCapacity < MAX_CARRY_CAPACITY
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                      style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                    >
+                      +1 Form Capacity (${UPGRADE_COSTS.carryCapacity})
+                      <div className="text-xs opacity-80">
+                        Current: {displayState.player.carryCapacity}/{MAX_CARRY_CAPACITY}
+                      </div>
+                    </button>
+
+                    {/* Sprint power-up */}
+                    <button
+                      onClick={handleBuySprint}
+                      disabled={displayState.totalFunding < UPGRADE_COSTS.sprint || displayState.sprintTimer > 0}
+                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
+                        displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0
+                          ? 'text-white hover:opacity-90'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                      style={{
+                        fontFamily: 'Comic Sans MS, cursive',
+                        backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? COLORS.uiYellow : undefined,
+                        color: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? '#333' : undefined
+                      }}
+                    >
+                      SPRINT (${UPGRADE_COSTS.sprint})
+                      <div className="text-xs opacity-80">
+                        {displayState.sprintTimer > 0 ? `Active: ${Math.ceil(displayState.sprintTimer)}s` : `${SPRINT_DURATION}s speed boost`}
+                      </div>
+                    </button>
+
+                    {/* No ICE power-up */}
+                    <button
+                      onClick={handleBuyNoIce}
+                      disabled={displayState.totalFunding < UPGRADE_COSTS.noIce || displayState.noIceTimer > 0}
+                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
+                        displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0
+                          ? 'text-white hover:opacity-90'
+                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      }`}
+                      style={{
+                        fontFamily: 'Comic Sans MS, cursive',
+                        backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0 ? COLORS.uiPink : undefined
+                      }}
+                    >
+                      NO ICE (${UPGRADE_COSTS.noIce})
+                      <div className="text-xs opacity-80">
+                        {displayState.noIceTimer > 0 ? `Active: ${Math.ceil(displayState.noIceTimer)}s` : `${NO_ICE_DURATION}s ICE-free`}
+                      </div>
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setShowShop(false)}
+                    className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
+                    style={{
+                      fontFamily: 'Comic Sans MS, cursive',
+                      backgroundColor: COLORS.uiBlue,
+                      border: '2px solid #3070b8'
+                    }}
+                  >
+                    BACK
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -273,73 +613,101 @@ export default function GameCanvas() {
         {(isWin || isLose) && (
           <div className="absolute inset-0 flex items-center justify-center"
                style={{ backgroundColor: isWin ? 'rgba(29, 209, 161, 0.9)' : 'rgba(255, 107, 107, 0.9)' }}>
-            <div className="p-8 rounded-lg shadow-2xl max-w-md"
+            <div className="p-6 rounded-lg shadow-2xl max-w-md"
                  style={{
                    backgroundColor: COLORS.uiPaper,
                    border: `6px solid ${isWin ? COLORS.uiGreen : COLORS.uiRed}`,
                    transform: 'rotate(-1deg)'
                  }}>
-              <h1 className="text-4xl font-bold mb-4 text-center"
+              {/* Level name */}
+              <div className="text-center mb-2">
+                <span className="px-3 py-1 text-sm font-bold text-white"
+                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                  {LEVELS[displayState.level]?.name || 'Unknown'}
+                </span>
+              </div>
+
+              <h1 className="text-3xl font-bold mb-3 text-center"
                   style={{
                     fontFamily: 'Comic Sans MS, cursive',
                     color: isWin ? COLORS.uiGreen : COLORS.uiRed
                   }}>
-                {isWin ? 'INSPECTION PASSED!' : 'BUSTED!'}
+                {isWin
+                  ? (displayState.level >= LEVELS.length - 1 ? 'GAME COMPLETE!' : 'INSPECTION PASSED!')
+                  : 'BUSTED!'}
               </h1>
 
-              <p className="text-lg mb-6 text-center"
+              <p className="text-base mb-4 text-center"
                  style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}>
                 {isWin
-                  ? 'You survived! Quality outcomes achieved.'
-                  : 'Suspicion too high! Investigation started.'}
+                  ? (displayState.level >= LEVELS.length - 1
+                      ? 'You saved all the daycares! Quality outcomes achieved.'
+                      : 'Level complete! Ready for the next daycare?')
+                  : 'An independent journalist caught you with ICE!'}
               </p>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="p-3 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }}>
-                  <div className="text-2xl font-bold text-white">{displayState.enrollments}</div>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }}>
+                  <div className="text-xl font-bold text-white">{displayState.enrollments}</div>
                   <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Enrollments</div>
                 </div>
-                <div className="p-3 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }}>
-                  <div className="text-2xl font-bold text-gray-800">${displayState.funding}</div>
-                  <div className="text-xs text-gray-700" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Funding</div>
+                <div className="p-2 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }}>
+                  <div className="text-xl font-bold text-gray-800">${displayState.totalFunding}</div>
+                  <div className="text-xs text-gray-700" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Total Saved</div>
                 </div>
-                <div className="p-3 text-center rotate-1" style={{ backgroundColor: COLORS.uiRed }}>
-                  <div className="text-2xl font-bold text-white">{Math.floor(displayState.suspicion)}%</div>
-                  <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Suspicion</div>
+                <div className="p-2 text-center rotate-1" style={{ backgroundColor: displayState.suspicion <= LOSE_THRESHOLD ? COLORS.uiGreen : COLORS.uiRed }}>
+                  <div className="text-xl font-bold text-white">{Math.floor(displayState.suspicion)}%</div>
+                  <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
                 </div>
-                <div className="p-3 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }}>
-                  <div className="text-2xl font-bold text-white">{Math.ceil(displayState.timeRemaining)}s</div>
-                  <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Time Left</div>
+                <div className="p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }}>
+                  <div className="text-xl font-bold text-white">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
+                  <div className="text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Carry Cap</div>
                 </div>
               </div>
 
+              {/* Action buttons */}
+              <div className="flex gap-2 mb-2">
+                <button
+                  onClick={handleRestart}
+                  className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
+                  style={{
+                    fontFamily: 'Comic Sans MS, cursive',
+                    backgroundColor: isWin ? COLORS.uiGreen : COLORS.uiRed,
+                    border: `3px solid ${isWin ? '#0a8a4d' : '#cc5555'}`
+                  }}
+                >
+                  RETRY
+                </button>
+                {isWin && displayState.level < LEVELS.length - 1 && (
+                  <button
+                    onClick={handleNextLevel}
+                    className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
+                    style={{
+                      fontFamily: 'Comic Sans MS, cursive',
+                      backgroundColor: COLORS.uiBlue,
+                      border: '3px solid #3070b8'
+                    }}
+                  >
+                    NEXT →
+                  </button>
+                )}
+              </div>
+
               <button
-                onClick={handleRestart}
-                className="w-full py-3 text-white text-xl font-bold rounded transform hover:scale-105 transition-all shadow-lg"
+                onClick={handleMenu}
+                className="w-full py-2 text-gray-800 text-sm font-bold rounded transform hover:scale-105 transition-all"
                 style={{
                   fontFamily: 'Comic Sans MS, cursive',
-                  backgroundColor: isWin ? COLORS.uiGreen : COLORS.uiRed,
-                  border: `3px solid ${isWin ? '#0a8a4d' : '#cc5555'}`
+                  backgroundColor: '#ddd',
+                  border: '2px solid #999'
                 }}
               >
-                PLAY AGAIN!
+                MENU
               </button>
             </div>
           </div>
         )}
       </div>
-
-      {/* Controls hint */}
-      {displayState.phase === 'playing' && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 text-xs hidden md:block"
-             style={{
-               backgroundColor: COLORS.uiPaper,
-               fontFamily: 'Comic Sans MS, cursive',
-               color: COLORS.uiCrayon
-             }}>
-          WASD / Arrows to move * Walk into forms * Go to Office to drop off
-        </div>
-      )}
     </div>
   );
 }
