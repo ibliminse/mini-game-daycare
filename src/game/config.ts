@@ -23,23 +23,23 @@ export const ENROLLMENT_PER_FORM = 1;
 export const SUSPICION_REDUCTION_PER_FORM = 8; // how much suspicion decreases per form
 export const CAPACITY_BONUS_REDUCTION = 3; // extra reduction for full stack
 
-// Suspicion (starts at 100, need to get below 25 to win)
-export const INITIAL_SUSPICION = 100;
-export const LOSE_THRESHOLD = 25; // if above this at end, you lose
+// Suspicion (starts at 50, need to get to 30 or below to win)
+export const INITIAL_SUSPICION = 50;
+export const LOSE_THRESHOLD = 30; // if above this at end, you lose
 export const PASSIVE_SUSPICION_RATE = 0.8; // suspicion creeps up per second (faster)
 export const MAX_SUSPICION = 100;
 export const WARNING_THRESHOLD = 50; // warning when above this
 
 // Upgrades
 export const UPGRADE_COSTS = {
-  carryCapacity: 45, // cost per extra slot
-  sprint: 20, // speed boost
-  noIce: 50, // 30 seconds no ICE
+  carryCapacity: 10, // cost per extra slot
+  sprint: 15, // speed boost
+  noIce: 25, // no ICE spawns
 };
 export const MAX_CARRY_CAPACITY = 10;
-export const SPRINT_DURATION = 13; // seconds
-export const SPRINT_SPEED_MULTIPLIER = 1.8;
-export const NO_ICE_DURATION = 30; // seconds
+export const SPRINT_DURATION = 5; // seconds
+export const SPRINT_SPEED_MULTIPLIER = 1.5;
+export const NO_ICE_DURATION = 10; // seconds
 
 // Timer
 export const INSPECTION_TIME = 45; // 45 seconds per level
@@ -113,7 +113,7 @@ export const ICE_AGENT = {
 export const LEVELS = [
   // Level 1: Simple straight hallway - 2 classrooms (tutorial)
   {
-    name: 'Iftin Academy',
+    name: 'Tiny Tots Academy',
     hallway: { x: 100, y: 260, width: 600, height: 80 },
     classrooms: [
       { id: 'room-a', name: 'Room A', x: 100, y: 50, width: 250, height: 210 },
@@ -123,7 +123,7 @@ export const LEVELS = [
   },
   // Level 2: Longer hallway - 3 classrooms
   {
-    name: 'Barwaaqo Center',
+    name: 'Little Stars Learning',
     hallway: { x: 50, y: 260, width: 900, height: 80 },
     classrooms: [
       { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 220, height: 210 },
@@ -134,7 +134,7 @@ export const LEVELS = [
   },
   // Level 3: L-shaped hallway - 4 classrooms
   {
-    name: 'Nabad Academy',
+    name: 'Rainbow Kids Center',
     hallway: { x: 50, y: 260, width: 700, height: 80 },
     hallway2: { x: 670, y: 260, width: 80, height: 290 },
     classrooms: [
@@ -145,24 +145,9 @@ export const LEVELS = [
     ],
     office: { id: 'office', name: 'Office', x: 300, y: 340, width: 200, height: 210 },
   },
-  // Level 4: L-shaped with 4 classrooms
-  // Based on working Level 3 pattern - hallways MUST overlap at junction
+  // Level 4: T-shaped - 4 classrooms
   {
-    name: 'Hodan Daycare',
-    hallway: { x: 50, y: 260, width: 700, height: 80 },      // Main horizontal (same as L3)
-    hallway2: { x: 670, y: 260, width: 80, height: 290 },    // Vertical down (overlaps at x=670-750)
-    classrooms: [
-      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },   // bottom=260=hallway.y
-      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 200, height: 210 },
-      { id: 'room-c', name: 'Room C', x: 510, y: 50, width: 200, height: 210 },
-      { id: 'room-d', name: 'Room D', x: 50, y: 340, width: 200, height: 210 },  // top=340=hallway.y+80
-    ],
-    office: { id: 'office', name: 'Office', x: 750, y: 340, width: 200, height: 210 }, // right of hallway2
-  },
-  // Level 5: T-shaped - 5 classrooms
-  // Main horizontal with vertical branch going up
-  {
-    name: 'Salam Kids',
+    name: 'Sunshine Daycare',
     hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
     hallway2: { x: 420, y: 50, width: 80, height: 290 },     // Vertical up (overlaps at y=260-340)
     classrooms: [
@@ -170,16 +155,14 @@ export const LEVELS = [
       { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
       { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
       { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
-      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 200, height: 210 },
     ],
     office: { id: 'office', name: 'Office', x: 750, y: 340, width: 200, height: 210 },
   },
-  // Level 6: L-shaped reversed - 5 classrooms
-  // Hallway goes right then down, office at bottom right
+  // Level 5: 5 classrooms
   {
-    name: 'Hibo Center',
-    hallway: { x: 50, y: 260, width: 600, height: 80 },      // Horizontal left
-    hallway2: { x: 570, y: 260, width: 80, height: 290 },    // Vertical down (overlaps)
+    name: 'Happy Hearts Academy',
+    hallway: { x: 50, y: 260, width: 600, height: 80 },
+    hallway2: { x: 570, y: 260, width: 80, height: 290 },
     classrooms: [
       { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },
       { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 200, height: 210 },
@@ -189,61 +172,44 @@ export const LEVELS = [
     ],
     office: { id: 'office', name: 'Office', x: 650, y: 340, width: 200, height: 210 },
   },
-  // Level 7: T-shaped with bottom branch - 6 classrooms
+  // Level 6: H-shaped - 6 classrooms
   {
-    name: 'Ayaan Academy',
+    name: 'Bright Futures Center',
     hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
-    hallway2: { x: 420, y: 260, width: 80, height: 290 },    // Vertical down (overlaps)
+    hallway2: { x: 50, y: 50, width: 80, height: 290 },      // Left vertical
+    hallway3: { x: 800, y: 50, width: 80, height: 290 },     // Right vertical
     classrooms: [
-      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 180, height: 210 },
-      { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
-      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
-      { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
-      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 180, height: 210 },
-      { id: 'room-f', name: 'Room F', x: 240, y: 340, width: 180, height: 210 },
+      { id: 'room-a', name: 'Room A', x: 130, y: 50, width: 200, height: 210 },
+      { id: 'room-b', name: 'Room B', x: 350, y: 50, width: 200, height: 210 },
+      { id: 'room-c', name: 'Room C', x: 570, y: 50, width: 200, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 130, y: 340, width: 200, height: 210 },
+      { id: 'room-e', name: 'Room E', x: 350, y: 340, width: 200, height: 210 },
+      { id: 'room-f', name: 'Room F', x: 570, y: 340, width: 200, height: 210 },
     ],
-    office: { id: 'office', name: 'Office', x: 500, y: 340, width: 200, height: 210 },
+    office: { id: 'office', name: 'Office', x: 880, y: 50, width: 70, height: 210 },
   },
-  // Level 8: Double L - 6 classrooms
-  // T-shape with vertical going up
+  // Level 7: E-shaped - 6 classrooms
   {
-    name: 'Deeqa Daycare',
-    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
-    hallway2: { x: 420, y: 50, width: 80, height: 290 },     // Vertical up (overlaps)
+    name: 'Growing Minds School',
+    hallway: { x: 50, y: 50, width: 80, height: 500 },       // Main vertical on left
+    hallway2: { x: 50, y: 50, width: 400, height: 80 },      // Top horizontal
+    hallway3: { x: 50, y: 260, width: 400, height: 80 },     // Middle horizontal
+    hallway4: { x: 50, y: 470, width: 400, height: 80 },     // Bottom horizontal
     classrooms: [
-      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 180, height: 210 },
-      { id: 'room-b', name: 'Room B', x: 240, y: 50, width: 180, height: 210 },
-      { id: 'room-c', name: 'Room C', x: 500, y: 50, width: 180, height: 210 },
-      { id: 'room-d', name: 'Room D', x: 690, y: 50, width: 180, height: 210 },
-      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 200, height: 210 },
-      { id: 'room-f', name: 'Room F', x: 260, y: 340, width: 200, height: 210 },
+      { id: 'room-a', name: 'Room A', x: 130, y: 130, width: 180, height: 130 },
+      { id: 'room-b', name: 'Room B', x: 330, y: 130, width: 180, height: 130 },
+      { id: 'room-c', name: 'Room C', x: 530, y: 50, width: 200, height: 210 },
+      { id: 'room-d', name: 'Room D', x: 530, y: 260, width: 200, height: 130 },
+      { id: 'room-e', name: 'Room E', x: 130, y: 340, width: 180, height: 130 },
+      { id: 'room-f', name: 'Room F', x: 330, y: 340, width: 180, height: 130 },
     ],
-    office: { id: 'office', name: 'Office', x: 700, y: 340, width: 200, height: 210 },
+    office: { id: 'office', name: 'Office', x: 530, y: 390, width: 200, height: 160 },
   },
-  // Level 9: Wide T - 7 classrooms
-  // Main hallway with two vertical branches
+  // Level 8: Maze layout - 8 classrooms (hardest)
   {
-    name: 'Farah Center',
+    name: 'Community Kids Campus',
     hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
-    hallway2: { x: 200, y: 260, width: 80, height: 290 },    // Left branch down
-    hallway3: { x: 650, y: 260, width: 80, height: 290 },    // Right branch down
-    classrooms: [
-      { id: 'room-a', name: 'Room A', x: 50, y: 50, width: 200, height: 210 },
-      { id: 'room-b', name: 'Room B', x: 280, y: 50, width: 180, height: 210 },
-      { id: 'room-c', name: 'Room C', x: 480, y: 50, width: 180, height: 210 },
-      { id: 'room-d', name: 'Room D', x: 680, y: 50, width: 180, height: 210 },
-      { id: 'room-e', name: 'Room E', x: 50, y: 340, width: 150, height: 210 },
-      { id: 'room-f', name: 'Room F', x: 280, y: 340, width: 180, height: 210 },
-      { id: 'room-g', name: 'Room G', x: 730, y: 340, width: 180, height: 210 },
-    ],
-    office: { id: 'office', name: 'Office', x: 480, y: 340, width: 170, height: 210 },
-  },
-  // Level 10: H-shaped - 8 classrooms (hardest)
-  // Three vertical segments connected by horizontal
-  {
-    name: 'Warsame Academy',
-    hallway: { x: 50, y: 260, width: 900, height: 80 },      // Main horizontal
-    hallway2: { x: 50, y: 50, width: 80, height: 290 },      // Left vertical (overlaps)
+    hallway2: { x: 50, y: 50, width: 80, height: 290 },      // Left vertical
     hallway3: { x: 420, y: 50, width: 80, height: 290 },     // Center vertical
     hallway4: { x: 800, y: 50, width: 80, height: 290 },     // Right vertical
     classrooms: [

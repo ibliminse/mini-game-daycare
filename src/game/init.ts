@@ -17,7 +17,9 @@ import {
  * Build the school layout for a specific level
  */
 function createBuilding(levelIndex: number): Building {
-  const level = LEVELS[levelIndex] || LEVELS[0];
+  // Clamp level index to valid range
+  const validIndex = Math.max(0, Math.min(levelIndex, LEVELS.length - 1));
+  const level = LEVELS[validIndex];
   const rooms: Room[] = [];
   const doors: Door[] = [];
 
@@ -354,7 +356,9 @@ function createDefaultUpgrades(): Upgrades {
  * Get desk position for a level
  */
 function getDeskForLevel(levelIndex: number) {
-  const level = LEVELS[levelIndex] || LEVELS[0];
+  // Clamp level index to valid range
+  const validIndex = Math.max(0, Math.min(levelIndex, LEVELS.length - 1));
+  const level = LEVELS[validIndex];
   return {
     x: level.office.x + 40,
     y: level.office.y + 60,
@@ -374,9 +378,11 @@ export function createInitialState(
   persistedUpgrades?: Upgrades,
   persistedFunding: number = 0
 ): GameState {
-  const building = createBuilding(levelIndex);
+  // Clamp level index to valid range
+  const validLevelIndex = Math.max(0, Math.min(levelIndex, LEVELS.length - 1));
+  const building = createBuilding(validLevelIndex);
   const forms = spawnForms(building);
-  const level = LEVELS[levelIndex] || LEVELS[0];
+  const level = LEVELS[validLevelIndex];
   const upgrades = persistedUpgrades || createDefaultUpgrades();
 
   // Start player in the hallway
@@ -396,7 +402,7 @@ export function createInitialState(
     },
     forms,
     building,
-    desk: getDeskForLevel(levelIndex),
+    desk: getDeskForLevel(validLevelIndex),
     iceAgent: createIceAgent(),
     iceWarning: createIceWarning(),
     enrollments: 0,
@@ -404,7 +410,7 @@ export function createInitialState(
     totalFunding: persistedFunding,
     suspicion: INITIAL_SUSPICION,
     timeRemaining: INSPECTION_TIME,
-    level: levelIndex,
+    level: validLevelIndex,
     upgrades,
     sprintTimer: 0,
     noIceTimer: 0,

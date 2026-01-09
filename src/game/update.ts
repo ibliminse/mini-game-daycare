@@ -90,7 +90,9 @@ function canIceSeePlayer(ice: IceAgent, playerX: number, playerY: number): boole
  * Spawn ICE agent at edge of hallway
  */
 function spawnIceAgent(state: GameState): IceAgent {
-  const level = LEVELS[state.level] || LEVELS[0];
+  // Clamp level index to valid range
+  const validIndex = Math.max(0, Math.min(state.level, LEVELS.length - 1));
+  const level = LEVELS[validIndex];
   const hallway = level.hallway;
 
   // Randomly spawn from left or right
@@ -111,7 +113,9 @@ function spawnIceAgent(state: GameState): IceAgent {
  */
 function updateIceAgent(state: GameState, dt: number): void {
   const ice = state.iceAgent;
-  const level = LEVELS[state.level] || LEVELS[0];
+  // Clamp level index to valid range
+  const validIndex = Math.max(0, Math.min(state.level, LEVELS.length - 1));
+  const level = LEVELS[validIndex];
   const hallway = level.hallway;
 
   if (ice.active) {

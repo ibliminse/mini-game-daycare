@@ -37,7 +37,11 @@ export default function GameCanvas() {
         const progress = JSON.parse(savedProgress);
         if (progress.upgrades) setPersistentUpgrades(progress.upgrades);
         if (progress.funding !== undefined) setPersistentFunding(progress.funding);
-        if (progress.level !== undefined) setCurrentLevel(progress.level);
+        // Validate saved level is within bounds (important when level count changes)
+        if (progress.level !== undefined) {
+          const validLevel = Math.max(0, Math.min(progress.level, LEVELS.length - 1));
+          setCurrentLevel(validLevel);
+        }
       }
     } catch {
       // If parsing fails, use defaults
