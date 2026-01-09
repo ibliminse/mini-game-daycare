@@ -1,27 +1,39 @@
-// Canvas rendering functions
+// Canvas rendering functions - Preschool Chaos style
 
-import { GameState } from './types';
+import { GameState, Room } from './types';
 import {
   MAP_WIDTH,
   MAP_HEIGHT,
-  FORM_RADIUS,
   COLORS,
   WARNING_THRESHOLD,
+  WALL_THICKNESS,
 } from './config';
+
+// Seeded random for consistent decorations
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
 
 /**
  * Main render function
  */
 export function render(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
-  // Clear canvas
-  ctx.fillStyle = COLORS.floor;
+  // Clear with background color
+  ctx.fillStyle = '#2d3436';
   ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
 
-  // Draw desk with glow if player carrying forms
-  drawDesk(ctx, state, time);
+  // Draw building
+  drawBuilding(ctx, state, time);
 
-  // Draw forms
-  drawForms(ctx, state);
+  // Draw doors
+  drawDoors(ctx, state);
+
+  // Draw forms in classrooms
+  drawForms(ctx, state, time);
+
+  // Draw desk
+  drawDesk(ctx, state, time);
 
   // Draw player
   drawPlayer(ctx, state, time);
@@ -31,6 +43,9 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
     drawFormStack(ctx, state, time);
   }
 
+  // Draw room labels
+  drawRoomLabels(ctx, state);
+
   // Draw warning banner if suspicion high
   if (state.suspicion >= WARNING_THRESHOLD && state.phase === 'playing') {
     drawWarningBanner(ctx, time);
@@ -38,7 +53,217 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
 }
 
 /**
- * Draw the enrollment desk
+ * Draw all rooms in the building
+ */
+function drawBuilding(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
+  for (const room of state.building.rooms) {
+    drawRoom(ctx, room, time);
+  }
+}
+
+/**
+ * Draw a single room with decorations
+ */
+function drawRoom(ctx: CanvasRenderingContext2D, room: Room, time: number): void {
+  const { x, y, width, height } = room.bounds;
+
+  // Floor
+  ctx.fillStyle = room.color;
+  ctx.fillRect(x, y, width, height);
+
+  // Add floor pattern for classrooms
+  if (room.type === 'classroom') {
+    drawClassroomDecorations(ctx, room, time);
+  }
+
+  // Wall border
+  ctx.strokeStyle = COLORS.wall;
+  ctx.lineWidth = WALL_THICKNESS;
+  ctx.strokeRect(x + WALL_THICKNESS / 2, y + WALL_THICKNESS / 2, width - WALL_THICKNESS, height - WALL_THICKNESS);
+
+  // Wall trim (inner line)
+  ctx.strokeStyle = COLORS.wallTrim;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + WALL_THICKNESS + 2, y + WALL_THICKNESS + 2, width - WALL_THICKNESS * 2 - 4, height - WALL_THICKNESS * 2 - 4);
+}
+
+/**
+ * Draw classroom decorations (bulletin boards, kid art, mess)
+ */
+function drawClassroomDecorations(ctx: CanvasRenderingContext2D, room: Room, time: number): void {
+  const { x, y, width, height } = room.bounds;
+  const seed = room.id.charCodeAt(room.id.length - 1);
+
+  // Bulletin board on wall - positioned lower
+  const boardX = x + 20;
+  const boardY = y + 50;
+  const boardW = 60;
+  const boardH = 40;
+
+  ctx.fillStyle = COLORS.bulletinBoard;
+  ctx.fillRect(boardX, boardY, boardW, boardH);
+  ctx.strokeStyle = '#8b4513';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(boardX, boardY, boardW, boardH);
+
+  // Kid drawings on bulletin board
+  for (let i = 0; i < 3; i++) {
+    const paperX = boardX + 5 + i * 18;
+    const paperY = boardY + 5 + seededRandom(seed + i) * 10;
+    const color = COLORS.constructionPaper[Math.floor(seededRandom(seed + i + 10) * COLORS.constructionPaper.length)];
+
+    ctx.fillStyle = color;
+    ctx.fillRect(paperX, paperY, 15, 20);
+
+    // Crayon scribble
+    ctx.strokeStyle = COLORS.formCrayon[Math.floor(seededRandom(seed + i + 20) * COLORS.formCrayon.length)];
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(paperX + 3, paperY + 5);
+    ctx.lineTo(paperX + 12, paperY + 15);
+    ctx.stroke();
+  }
+
+  // Random toy/mess on floor
+  const toyX = x + width - 50 + seededRandom(seed + 30) * 20;
+  const toyY = y + height - 40 + seededRandom(seed + 31) * 15;
+  drawToy(ctx, toyX, toyY, seed);
+
+  // Crayon marks on floor
+  ctx.strokeStyle = COLORS.formCrayon[seed % COLORS.formCrayon.length];
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const markX = x + 30 + seededRandom(seed + 40) * (width - 80);
+  const markY = y + height - 30;
+  ctx.moveTo(markX, markY);
+  ctx.quadraticCurveTo(markX + 20, markY - 10, markX + 40, markY + 5);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+}
+
+/**
+ * Draw a toy on the floor
+ */
+function drawToy(ctx: CanvasRenderingContext2D, x: number, y: number, seed: number): void {
+  const toyType = seed % 3;
+
+  if (toyType === 0) {
+    // Block
+    ctx.fillStyle = COLORS.constructionPaper[seed % COLORS.constructionPaper.length];
+    ctx.fillRect(x, y, 15, 15);
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, 15, 15);
+  } else if (toyType === 1) {
+    // Ball
+    ctx.fillStyle = COLORS.formCrayon[(seed + 1) % COLORS.formCrayon.length];
+    ctx.beginPath();
+    ctx.arc(x + 8, y + 8, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  } else {
+    // Crayon
+    ctx.fillStyle = COLORS.formCrayon[(seed + 2) % COLORS.formCrayon.length];
+    ctx.fillRect(x, y, 20, 6);
+    ctx.fillStyle = '#f5d0c5';
+    ctx.fillRect(x + 17, y + 1, 5, 4);
+  }
+}
+
+/**
+ * Draw doors between rooms (just openings)
+ */
+function drawDoors(ctx: CanvasRenderingContext2D, state: GameState): void {
+  for (const door of state.building.doors) {
+    // Door opening - draw floor color to create opening in wall
+    ctx.fillStyle = COLORS.hallwayFloor;
+    ctx.fillRect(door.x + 5, door.y, door.width - 10, door.height);
+  }
+}
+
+/**
+ * Draw room labels (room names)
+ */
+function drawRoomLabels(ctx: CanvasRenderingContext2D, state: GameState): void {
+  ctx.font = 'bold 12px Comic Sans MS, cursive';
+  ctx.textAlign = 'center';
+
+  for (const room of state.building.rooms) {
+    if (room.type === 'classroom' || room.type === 'office') {
+      const { x, y, width, height } = room.bounds;
+      ctx.fillStyle = COLORS.wall;
+      // Position label near bottom of room
+      ctx.fillText(room.name, x + width / 2, y + height - 15);
+    }
+  }
+}
+
+/**
+ * Draw all uncollected forms
+ */
+function drawForms(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
+  for (const form of state.forms) {
+    if (!form.collected) {
+      drawForm(ctx, form.x, form.y, form.variant, time);
+    }
+  }
+}
+
+/**
+ * Draw a single form as a kid's drawing (stick figure only)
+ */
+function drawForm(ctx: CanvasRenderingContext2D, x: number, y: number, variant: number, time: number): void {
+  // Slight hover animation
+  const hover = Math.sin(time / 300 + variant) * 2;
+
+  ctx.save();
+  ctx.translate(x, y + hover);
+
+  // Paper
+  ctx.fillStyle = COLORS.formPaper;
+  ctx.strokeStyle = '#ccc';
+  ctx.lineWidth = 1;
+
+  // Slightly rotated paper
+  ctx.rotate((variant - 2) * 0.1);
+
+  ctx.beginPath();
+  ctx.rect(-10, -14, 20, 28);
+  ctx.fill();
+  ctx.stroke();
+
+  // Stick figure drawing (use variant for color only)
+  const crayonColor = COLORS.formCrayon[variant % COLORS.formCrayon.length];
+  ctx.strokeStyle = crayonColor;
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(0, -6, 4, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Body, arms, legs
+  ctx.beginPath();
+  ctx.moveTo(0, -2);
+  ctx.lineTo(0, 5);
+  ctx.moveTo(-4, 0);
+  ctx.lineTo(4, 0);
+  ctx.moveTo(0, 5);
+  ctx.lineTo(-3, 10);
+  ctx.moveTo(0, 5);
+  ctx.lineTo(3, 10);
+  ctx.stroke();
+
+  ctx.lineCap = 'butt';
+  ctx.restore();
+}
+
+/**
+ * Draw the enrollment desk with mess
  */
 function drawDesk(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
   const { desk, player } = state;
@@ -46,111 +271,203 @@ function drawDesk(ctx: CanvasRenderingContext2D, state: GameState, time: number)
   // Glow effect when player carrying forms
   if (player.carrying > 0) {
     const glowIntensity = 0.3 + 0.2 * Math.sin(time / 200);
-    const glowSize = 20;
 
-    ctx.shadowColor = 'rgba(74, 222, 128, 0.8)';
-    ctx.shadowBlur = glowSize * glowIntensity * 2;
+    ctx.shadowColor = 'rgba(46, 213, 115, 0.8)';
+    ctx.shadowBlur = 20 * glowIntensity;
 
-    ctx.fillStyle = `rgba(74, 222, 128, ${glowIntensity * 0.5})`;
+    ctx.fillStyle = `rgba(46, 213, 115, ${glowIntensity * 0.3})`;
     ctx.fillRect(desk.x - 10, desk.y - 10, desk.width + 20, desk.height + 20);
 
     ctx.shadowBlur = 0;
   }
 
-  // Desk body
+  // Desk body (wood)
   ctx.fillStyle = COLORS.desk;
   ctx.fillRect(desk.x, desk.y, desk.width, desk.height);
 
   // Desk top surface
   ctx.fillStyle = COLORS.deskTop;
-  ctx.fillRect(desk.x, desk.y, desk.width, 20);
+  ctx.fillRect(desk.x, desk.y, desk.width, 15);
 
-  // Label
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('ENROLLMENT', desk.x + desk.width / 2, desk.y + desk.height / 2 + 5);
-  ctx.font = '12px sans-serif';
-  ctx.fillText('DESK', desk.x + desk.width / 2, desk.y + desk.height / 2 + 22);
-}
-
-/**
- * Draw all uncollected forms
- */
-function drawForms(ctx: CanvasRenderingContext2D, state: GameState): void {
-  for (const form of state.forms) {
-    if (!form.collected) {
-      drawForm(ctx, form.x, form.y);
-    }
-  }
-}
-
-/**
- * Draw a single form (paper/document)
- */
-function drawForm(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-  const w = FORM_RADIUS * 1.5;
-  const h = FORM_RADIUS * 2;
-
-  // Paper background
-  ctx.fillStyle = '#fff8e1';
-  ctx.strokeStyle = COLORS.formOutline;
-  ctx.lineWidth = 2;
-
+  // Desk mess - coffee stain
+  ctx.fillStyle = 'rgba(139, 90, 43, 0.3)';
   ctx.beginPath();
-  ctx.rect(x - w / 2, y - h / 2, w, h);
+  ctx.ellipse(desk.x + 70, desk.y + 40, 12, 10, 0.2, 0, Math.PI * 2);
   ctx.fill();
+
+  // Desk mess - papers
+  ctx.fillStyle = '#fff';
+  ctx.save();
+  ctx.translate(desk.x + 20, desk.y + 30);
+  ctx.rotate(-0.1);
+  ctx.fillRect(0, 0, 25, 35);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(desk.x + 30, desk.y + 25);
+  ctx.rotate(0.15);
+  ctx.fillRect(0, 0, 25, 35);
+  ctx.restore();
+
+  // Desk mess - coffee mug
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(desk.x + desk.width - 25, desk.y + 35, 10, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Lines on paper
-  ctx.strokeStyle = '#ccc';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 3; i++) {
-    const ly = y - h / 2 + 5 + i * 5;
-    ctx.beginPath();
-    ctx.moveTo(x - w / 2 + 3, ly);
-    ctx.lineTo(x + w / 2 - 3, ly);
-    ctx.stroke();
-  }
+  // Desk mess - pencil cup
+  ctx.fillStyle = COLORS.uiRed;
+  ctx.fillRect(desk.x + desk.width - 50, desk.y + 25, 15, 25);
+
+  // Pencils sticking out
+  ctx.strokeStyle = COLORS.uiYellow;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(desk.x + desk.width - 47, desk.y + 25);
+  ctx.lineTo(desk.x + desk.width - 50, desk.y + 10);
+  ctx.stroke();
+
+  ctx.strokeStyle = COLORS.uiBlue;
+  ctx.beginPath();
+  ctx.moveTo(desk.x + desk.width - 42, desk.y + 25);
+  ctx.lineTo(desk.x + desk.width - 38, desk.y + 8);
+  ctx.stroke();
+
+  // Label
+  ctx.fillStyle = COLORS.uiCrayon;
+  ctx.font = 'bold 11px Comic Sans MS, cursive';
+  ctx.textAlign = 'center';
+  ctx.fillText('DROP OFF', desk.x + desk.width / 2, desk.y + desk.height - 10);
 }
 
 /**
- * Draw the player
+ * Draw the stressed adult player
  */
 function drawPlayer(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
   const { player } = state;
+  const stress = player.stress;
 
-  // Body bobbing animation
-  const bobOffset = Math.sin(time / 150) * 2;
+  // Body bobbing animation (faster when stressed)
+  const bobSpeed = 150 - stress * 50;
+  const bobAmount = 1.5 + stress * 1.5;
+  const bobOffset = Math.sin(time / bobSpeed) * bobAmount;
+
+  ctx.save();
+  ctx.translate(player.x, player.y + bobOffset);
 
   // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.beginPath();
-  ctx.ellipse(player.x, player.y + player.radius, player.radius * 0.8, player.radius * 0.3, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, player.radius + 2, player.radius * 0.9, player.radius * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Body
-  ctx.fillStyle = COLORS.player;
-  ctx.strokeStyle = COLORS.playerOutline;
-  ctx.lineWidth = 2;
-
+  // Body (polo shirt)
+  ctx.fillStyle = COLORS.playerShirt;
   ctx.beginPath();
-  ctx.arc(player.x, player.y + bobOffset, player.radius, 0, Math.PI * 2);
+  ctx.ellipse(0, 4, player.radius * 0.9, player.radius, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = '#3a7abd';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  // Face
-  ctx.fillStyle = '#f5d0c5';
+  // Collar
+  ctx.fillStyle = COLORS.playerShirt;
   ctx.beginPath();
-  ctx.arc(player.x, player.y - 3 + bobOffset, player.radius * 0.6, 0, Math.PI * 2);
+  ctx.moveTo(-5, -4);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(5, -4);
+  ctx.stroke();
+
+  // Head
+  ctx.fillStyle = COLORS.playerSkin;
+  ctx.beginPath();
+  ctx.arc(0, -6, player.radius * 0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eyes
-  ctx.fillStyle = '#333';
+  // Hair
+  ctx.fillStyle = COLORS.playerHair;
   ctx.beginPath();
-  ctx.arc(player.x - 3, player.y - 4 + bobOffset, 2, 0, Math.PI * 2);
-  ctx.arc(player.x + 3, player.y - 4 + bobOffset, 2, 0, Math.PI * 2);
+  ctx.arc(0, -10, player.radius * 0.5, Math.PI, 0, false);
   ctx.fill();
+
+  // Messy hair strands when stressed
+  if (stress > 0.3) {
+    ctx.strokeStyle = COLORS.playerHair;
+    ctx.lineWidth = 2;
+    const strandOffset = Math.sin(time / 100) * stress * 3;
+    ctx.beginPath();
+    ctx.moveTo(-3, -14);
+    ctx.lineTo(-5 + strandOffset, -18);
+    ctx.moveTo(3, -14);
+    ctx.lineTo(6 - strandOffset, -17);
+    ctx.stroke();
+  }
+
+  // Eyes (wider when stressed)
+  const eyeSize = 2 + stress * 1.5;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.ellipse(-4, -6, eyeSize, eyeSize * 1.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(4, -6, eyeSize, eyeSize * 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Pupils (darting around when stressed)
+  ctx.fillStyle = '#333';
+  const pupilOffset = stress > 0.5 ? Math.sin(time / 80) * 1.5 : 0;
+  ctx.beginPath();
+  ctx.arc(-4 + pupilOffset, -6, 1.5, 0, Math.PI * 2);
+  ctx.arc(4 + pupilOffset, -6, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Eyebrows (more furrowed when stressed)
+  ctx.strokeStyle = COLORS.playerHair;
+  ctx.lineWidth = 2;
+  const browFurrow = stress * 2;
+  ctx.beginPath();
+  ctx.moveTo(-6, -10 + browFurrow);
+  ctx.lineTo(-2, -9);
+  ctx.moveTo(6, -10 + browFurrow);
+  ctx.lineTo(2, -9);
+  ctx.stroke();
+
+  // Mouth (more grimace when stressed)
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (stress < 0.3) {
+    // Neutral
+    ctx.moveTo(-3, -1);
+    ctx.lineTo(3, -1);
+  } else if (stress < 0.7) {
+    // Worried
+    ctx.moveTo(-3, 0);
+    ctx.quadraticCurveTo(0, -2, 3, 0);
+  } else {
+    // Grimace
+    ctx.moveTo(-4, -1);
+    ctx.lineTo(-2, 0);
+    ctx.lineTo(0, -1);
+    ctx.lineTo(2, 0);
+    ctx.lineTo(4, -1);
+  }
+  ctx.stroke();
+
+  // Sweat drops when stressed
+  if (stress > 0.4) {
+    ctx.fillStyle = COLORS.playerSweat;
+    const sweatY = -8 + (time / 10 % 20);
+    const sweatAlpha = 1 - (time / 10 % 20) / 20;
+    ctx.globalAlpha = sweatAlpha;
+    ctx.beginPath();
+    ctx.ellipse(player.radius * 0.6, sweatY, 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
 }
 
 /**
@@ -158,26 +475,31 @@ function drawPlayer(ctx: CanvasRenderingContext2D, state: GameState, time: numbe
  */
 function drawFormStack(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
   const { player } = state;
-  const stackX = player.x - 25;
-  const stackY = player.y + 5;
+  const stackX = player.x - 20;
+  const stackY = player.y + 8;
 
   for (let i = 0; i < player.carrying; i++) {
-    const offsetY = -i * 6;
-    const wobble = Math.sin(time / 100 + i * 0.5) * 2;
+    const offsetY = -i * 5;
+    const wobble = Math.sin(time / 100 + i * 0.7) * 2;
+    const rotation = (Math.sin(time / 200 + i) * 0.1);
 
     ctx.save();
     ctx.translate(stackX + wobble, stackY + offsetY);
+    ctx.rotate(rotation);
 
-    // Form paper
-    const w = 12;
-    const h = 16;
-    ctx.fillStyle = '#fff8e1';
-    ctx.strokeStyle = COLORS.formOutline;
+    // Paper
+    ctx.fillStyle = COLORS.formPaper;
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1;
+    ctx.fillRect(-8, -10, 16, 20);
+    ctx.strokeRect(-8, -10, 16, 20);
+
+    // Quick scribble
+    ctx.strokeStyle = COLORS.formCrayon[i % COLORS.formCrayon.length];
     ctx.lineWidth = 1.5;
-
     ctx.beginPath();
-    ctx.rect(-w / 2, -h / 2, w, h);
-    ctx.fill();
+    ctx.moveTo(-4, -4);
+    ctx.lineTo(4, 2);
     ctx.stroke();
 
     ctx.restore();
@@ -188,13 +510,26 @@ function drawFormStack(ctx: CanvasRenderingContext2D, state: GameState, time: nu
  * Draw warning banner when suspicion is high
  */
 function drawWarningBanner(ctx: CanvasRenderingContext2D, time: number): void {
-  const flashAlpha = 0.5 + 0.3 * Math.sin(time / 150);
+  const flashAlpha = 0.6 + 0.3 * Math.sin(time / 100);
 
-  ctx.fillStyle = `rgba(220, 38, 38, ${flashAlpha * 0.3})`;
-  ctx.fillRect(0, 0, MAP_WIDTH, 40);
+  // Construction paper style banner
+  ctx.fillStyle = `rgba(255, 107, 107, ${flashAlpha * 0.8})`;
+  ctx.fillRect(MAP_WIDTH / 2 - 150, 10, 300, 35);
 
-  ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-  ctx.font = 'bold 18px sans-serif';
+  // Jagged edge effect
+  ctx.strokeStyle = COLORS.uiRed;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  for (let i = 0; i < 30; i++) {
+    const x = MAP_WIDTH / 2 - 150 + i * 10;
+    const y = i % 2 === 0 ? 10 : 13;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 18px Comic Sans MS, cursive';
   ctx.textAlign = 'center';
-  ctx.fillText('HIGH SUSPICION', MAP_WIDTH / 2, 27);
+  ctx.fillText('!! SUSPICION HIGH !!', MAP_WIDTH / 2, 33);
 }

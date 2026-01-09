@@ -2,10 +2,8 @@
 
 import { GameState, InputState, JoystickState } from './types';
 import { getCombinedDirection } from './input';
-import { canPickupForm, isPlayerAtDesk, clampToMap } from './collisions';
+import { canPickupForm, isPlayerAtDesk, clampToWalkable } from './collisions';
 import {
-  MAP_WIDTH,
-  MAP_HEIGHT,
   FUNDING_PER_FORM,
   ENROLLMENT_PER_FORM,
   SUSPICION_PER_FORM,
@@ -23,6 +21,11 @@ function cloneState(state: GameState): GameState {
     ...state,
     player: { ...state.player },
     forms: state.forms.map((f) => ({ ...f })),
+    building: {
+      ...state.building,
+      rooms: state.building.rooms.map((r) => ({ ...r, bounds: { ...r.bounds } })),
+      doors: state.building.doors.map((d) => ({ ...d, connects: [...d.connects] as [string, string] })),
+    },
     desk: { ...state.desk },
   };
 }
@@ -46,15 +49,27 @@ export function updateGame(
   // Get movement direction
   const { dx, dy } = getCombinedDirection(input, joystick);
 
-  // Update player position
+  // Update player position with wall collision
   if (dx !== 0 || dy !== 0) {
     const newX = newState.player.x + dx * newState.player.speed * dt;
     const newY = newState.player.y + dy * newState.player.speed * dt;
 
-    const clamped = clampToMap(newX, newY, newState.player.radius, MAP_WIDTH, MAP_HEIGHT);
+    const clamped = clampToWalkable(
+      newX,
+      newY,
+      newState.player.x,
+      newState.player.y,
+      newState.player.radius,
+      newState.building
+    );
+
     newState.player.x = clamped.x;
     newState.player.y = clamped.y;
   }
+
+  // Update player stress based on suspicion and carrying
+  const targetStress = Math.min(1, (newState.suspicion / MAX_SUSPICION) * 0.5 + (newState.player.carrying / CARRY_CAPACITY) * 0.5);
+  newState.player.stress += (targetStress - newState.player.stress) * dt * 3;
 
   // Check form pickups
   if (newState.player.carrying < newState.player.carryCapacity) {
@@ -83,7 +98,7 @@ export function updateGame(
     newState.suspicion += formsDropped * SUSPICION_PER_FORM + capacityBonus;
     newState.player.carrying = 0;
 
-    // Respawn collected forms at new positions
+    // Respawn collected forms in classrooms
     respawnForms(newState);
   }
 
@@ -108,32 +123,22 @@ export function updateGame(
 }
 
 /**
- * Respawn collected forms at new random positions
+ * Respawn collected forms in classrooms
  */
 function respawnForms(state: GameState): void {
-  const margin = 40;
-  const deskPadding = 50;
+  const classrooms = state.building.rooms.filter((r) => r.type === 'classroom');
 
   for (const form of state.forms) {
     if (form.collected) {
-      let x: number, y: number;
-      let attempts = 0;
+      // Pick a random classroom
+      const room = classrooms[Math.floor(Math.random() * classrooms.length)];
+      const margin = 30;
 
-      do {
-        x = margin + Math.random() * (MAP_WIDTH - margin * 2);
-        y = margin + Math.random() * (MAP_HEIGHT - margin * 2);
-        attempts++;
-      } while (
-        attempts < 100 &&
-        x > state.desk.x - deskPadding &&
-        x < state.desk.x + state.desk.width + deskPadding &&
-        y > state.desk.y - deskPadding &&
-        y < state.desk.y + state.desk.height + deskPadding
-      );
-
-      form.x = x;
-      form.y = y;
+      form.x = room.bounds.x + margin + Math.random() * (room.bounds.width - margin * 2);
+      form.y = room.bounds.y + margin + Math.random() * (room.bounds.height - margin * 2);
       form.collected = false;
+      form.roomId = room.id;
+      form.variant = Math.floor(Math.random() * 5);
     }
   }
 }
