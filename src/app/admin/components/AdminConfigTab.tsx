@@ -7,9 +7,11 @@ interface AdminConfigTabProps {
   config: EditableConfig;
   onConfigChange: (key: keyof EditableConfig, value: number) => void;
   onGoToMaps: () => void;
+  onSaveConfig?: () => void;
+  configSaved?: boolean;
 }
 
-export default function AdminConfigTab({ config, onConfigChange, onGoToMaps }: AdminConfigTabProps) {
+export default function AdminConfigTab({ config, onConfigChange, onGoToMaps, onSaveConfig, configSaved }: AdminConfigTabProps) {
   const resetToDefaults = () => {
     onConfigChange('inspectionTime', INSPECTION_TIME);
     onConfigChange('playerSpeed', PLAYER_SPEED);
@@ -40,17 +42,28 @@ export default function AdminConfigTab({ config, onConfigChange, onGoToMaps }: A
           <h2 className="text-lg font-bold" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
             Game Configuration (Editable)
           </h2>
-          <button
-            onClick={resetToDefaults}
-            className="px-3 py-1 text-sm font-bold rounded hover:scale-105 transition-transform"
-            style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive' }}
-          >
-            Reset to Defaults
-          </button>
+          <div className="flex gap-2">
+            {onSaveConfig && (
+              <button
+                onClick={onSaveConfig}
+                className="px-3 py-1 text-sm font-bold rounded hover:scale-105 transition-transform text-white"
+                style={{ backgroundColor: configSaved ? COLORS.uiGreen : COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}
+              >
+                {configSaved ? '✓ Saved!' : '💾 Save Permanently'}
+              </button>
+            )}
+            <button
+              onClick={resetToDefaults}
+              className="px-3 py-1 text-sm font-bold rounded hover:scale-105 transition-transform"
+              style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive' }}
+            >
+              Reset to Defaults
+            </button>
+          </div>
         </div>
 
         <p className="text-sm mb-4 text-gray-600" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-          Edit values below and use &quot;Play Test&quot; on a level to test your changes. Changes here are temporary for testing.
+          Edit values below. Click &quot;Save Permanently&quot; to keep changes, or use &quot;Play Test&quot; to test first.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

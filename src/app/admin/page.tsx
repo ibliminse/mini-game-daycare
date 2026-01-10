@@ -7,13 +7,15 @@ import { updateGame, resetIceTimer } from '@/game/update';
 import { render } from '@/game/render';
 import { setupKeyboardListeners } from '@/game/input';
 import { GameState, InputState, JoystickState, Building, Room, Door, Form } from '@/game/types';
-import { AdminLogin, AdminStatsTab, AdminConfigTab, EditableLevel, EditableRoom, EditableConfig, VALIDATION, EDITOR_WIDTH, EDITOR_HEIGHT } from './components';
+import { LevelSpec } from '@/game/levelSpec';
+import { getCustomLevels, saveCustomLevels, addCustomLevel, deleteCustomLevel, duplicateLevel, saveGameConfig, getSavedConfig, clearSavedConfig } from '@/game/storage';
+import { AdminLogin, AdminStatsTab, AdminConfigTab, AdminThemeTab, EditableLevel, EditableRoom, EditableConfig, VALIDATION, EDITOR_WIDTH, EDITOR_HEIGHT } from './components';
 
 export default function AdminPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'maps' | 'config' | 'stats'>('maps');
+  const [activeTab, setActiveTab] = useState<'maps' | 'config' | 'theme' | 'stats'>('maps');
   const [selectedLevel, setSelectedLevel] = useState<number | null>(null);
   const [isPlayTesting, setIsPlayTesting] = useState(false);
   const [showConfigEditor, setShowConfigEditor] = useState(false);
@@ -28,6 +30,10 @@ export default function AdminPage() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isEditMode, setIsEditMode] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+
+  // Custom levels state
+  const [customLevels, setCustomLevels] = useState<LevelSpec[]>([]);
+  const [allLevels, setAllLevels] = useState<LevelSpec[]>([...LEVEL_SPECS]);
 
   // Editable config state
   const [config, setConfig] = useState<EditableConfig>({
@@ -129,9 +135,23 @@ export default function AdminPage() {
     checkAuth();
   }, []);
 
-  // Convert a LEVEL_SPECS entry to editable format
+  // Load custom levels and saved config on mount
+  useEffect(() => {
+    const loaded = getCustomLevels();
+    setCustomLevels(loaded);
+    setAllLevels([...LEVEL_SPECS, ...loaded]);
+
+    // Load saved config
+    const savedConfig = getSavedConfig();
+    if (savedConfig) {
+      setConfig(prev => ({ ...prev, ...savedConfig }));
+    }
+  }, []);
+
+  // Convert a level to editable format
   const levelToEditable = useCallback((levelIndex: number): EditableLevel => {
-    const level = LEVEL_SPECS[levelIndex];
+    const levels = [...LEVEL_SPECS, ...customLevels];
+    const level = levels[levelIndex] || LEVEL_SPECS[0];
     const rooms: EditableRoom[] = [];
 
     // Add all hallways from the array
@@ -172,8 +192,18 @@ export default function AdminPage() {
       type: 'office',
     });
 
-    return { name: level.name, rooms };
-  }, []);
+    return {
+      id: level.id,
+      name: level.name,
+      rooms,
+      iceConfig: {
+        agentCount: level.iceConfig.agentCount,
+        roomSearchProbability: level.iceConfig.roomSearchProbability,
+        searchDuration: level.iceConfig.searchDuration,
+      },
+      isCustom: level.isCustom,
+    };
+  }, [customLevels]);
 
   // Convert editable level to game-ready Building format
   const editableToBuilding = useCallback((editable: EditableLevel): Building => {
@@ -970,7 +1000,7 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <nav className="flex gap-1 p-1.5 sm:p-2" style={{ backgroundColor: COLORS.bulletinBoard }} role="tablist" aria-label="Admin sections">
-        {(['maps', 'config', 'stats'] as const).map((tab) => (
+        {(['maps', 'config', 'theme', 'stats'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -985,8 +1015,8 @@ export default function AdminPage() {
             aria-selected={activeTab === tab}
             aria-controls={`${tab}-panel`}
           >
-            {tab === 'maps' ? '🗺️' : tab === 'config' ? '⚙️' : '📊'}
-            <span className="hidden sm:inline"> {tab === 'maps' ? 'Maps' : tab === 'config' ? 'Config' : 'Stats'}</span>
+            {tab === 'maps' ? '🗺️' : tab === 'config' ? '⚙️' : tab === 'theme' ? '🎨' : '📊'}
+            <span className="hidden sm:inline"> {tab === 'maps' ? 'Maps' : tab === 'config' ? 'Config' : tab === 'theme' ? 'Theme' : 'Stats'}</span>
           </button>
         ))}
       </nav>
@@ -1000,29 +1030,80 @@ export default function AdminPage() {
             {/* Level List */}
             <div className="p-3 sm:p-4 rounded-lg lg:w-1/3 lg:min-w-[280px]" style={{ backgroundColor: COLORS.uiPaper }}>
               <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-                All Levels ({LEVEL_SPECS.length})
+                All Levels ({allLevels.length})
               </h2>
+              {/* Create New Level Button */}
+              <button
+                onClick={() => {
+                  const newLevel: LevelSpec = {
+                    id: `custom-${Date.now()}`,
+                    name: `Custom Level ${customLevels.length + 1}`,
+                    difficulty: 1,
+                    isCustom: true,
+                    createdAt: Date.now(),
+                    hallways: [{ id: 'hallway-1', x: 100, y: 260, width: 600, height: 80 }],
+                    classrooms: [
+                      { id: 'room-a', name: 'Room A', x: 100, y: 50, width: 180, height: 200 },
+                      { id: 'room-b', name: 'Room B', x: 300, y: 50, width: 180, height: 200 },
+                    ],
+                    office: { id: 'office', name: 'Office', x: 500, y: 350, width: 200, height: 200 },
+                    iceConfig: { agentCount: 1, roomSearchProbability: 0, searchDuration: 3 },
+                  };
+                  const updated = addCustomLevel(newLevel);
+                  setCustomLevels(updated);
+                  setAllLevels([...LEVEL_SPECS, ...updated]);
+                  setSelectedLevel(LEVEL_SPECS.length + updated.length - 1);
+                  setEditableLevel(null);
+                }}
+                className="w-full p-2 mb-2 rounded text-center font-bold text-white text-xs sm:text-sm"
+                style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}
+              >
+                + Create New Level
+              </button>
               <div className="space-y-2 max-h-[300px] lg:max-h-[500px] overflow-y-auto">
-                {LEVEL_SPECS.map((level, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSelectLevel(index)}
-                    className={`w-full p-2 sm:p-3 rounded text-left transition-all active:scale-[0.98] ${
-                      selectedLevel === index ? 'ring-2' : ''
-                    }`}
-                    style={{
-                      backgroundColor: selectedLevel === index ? COLORS.uiBlue : COLORS.uiYellow,
-                      color: selectedLevel === index ? 'white' : '#333',
-                      fontFamily: 'Comic Sans MS, cursive',
-                    }}
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-xs sm:text-sm">Lv{index + 1}: {level.name}</span>
-                      <span className="text-xs opacity-70">
-                        {level.classrooms.length}r
-                      </span>
-                    </div>
-                  </button>
+                {allLevels.map((level, index) => (
+                  <div key={level.id || index} className="flex gap-1">
+                    <button
+                      onClick={() => handleSelectLevel(index)}
+                      className={`flex-1 p-2 sm:p-3 rounded text-left transition-all active:scale-[0.98] ${
+                        selectedLevel === index ? 'ring-2' : ''
+                      }`}
+                      style={{
+                        backgroundColor: selectedLevel === index ? COLORS.uiBlue : level.isCustom ? COLORS.uiPink : COLORS.uiYellow,
+                        color: selectedLevel === index ? 'white' : level.isCustom ? 'white' : '#333',
+                        fontFamily: 'Comic Sans MS, cursive',
+                      }}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-xs sm:text-sm">
+                          {level.isCustom ? '⭐' : `Lv${index + 1}:`} {level.name}
+                        </span>
+                        <span className="text-xs opacity-70">
+                          {level.classrooms.length}r
+                        </span>
+                      </div>
+                    </button>
+                    {level.isCustom && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Delete this custom level?')) {
+                            const updated = deleteCustomLevel(level.id);
+                            setCustomLevels(updated);
+                            setAllLevels([...LEVEL_SPECS, ...updated]);
+                            if (selectedLevel === index) {
+                              setSelectedLevel(null);
+                              setEditableLevel(null);
+                            }
+                          }
+                        }}
+                        className="px-2 rounded text-white text-xs"
+                        style={{ backgroundColor: COLORS.uiRed }}
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -1295,6 +1376,60 @@ export default function AdminPage() {
                     </div>
                   )}
 
+                  {/* ICE Configuration in edit mode */}
+                  {isEditMode && editableLevel.iceConfig && (
+                    <div className="p-2 sm:p-3 rounded mb-3 sm:mb-4" style={{ backgroundColor: '#ffe4e4' }}>
+                      <h4 className="font-bold text-xs sm:text-sm mb-2" style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiRed }}>
+                        ICE Agent Configuration
+                      </h4>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <label className="block font-bold mb-1">Agents (1-3)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={3}
+                            value={editableLevel.iceConfig.agentCount}
+                            onChange={(e) => setEditableLevel(prev => prev ? {
+                              ...prev,
+                              iceConfig: { ...prev.iceConfig, agentCount: Math.max(1, Math.min(3, Number(e.target.value))) }
+                            } : prev)}
+                            className="w-full p-1 border rounded text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold mb-1">Search % (0-100)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={Math.round(editableLevel.iceConfig.roomSearchProbability * 100)}
+                            onChange={(e) => setEditableLevel(prev => prev ? {
+                              ...prev,
+                              iceConfig: { ...prev.iceConfig, roomSearchProbability: Math.max(0, Math.min(100, Number(e.target.value))) / 100 }
+                            } : prev)}
+                            className="w-full p-1 border rounded text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-bold mb-1">Search Time (s)</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            step={0.5}
+                            value={editableLevel.iceConfig.searchDuration}
+                            onChange={(e) => setEditableLevel(prev => prev ? {
+                              ...prev,
+                              iceConfig: { ...prev.iceConfig, searchDuration: Math.max(1, Math.min(10, Number(e.target.value))) }
+                            } : prev)}
+                            className="w-full p-1 border rounded text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Level Stats */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-xs sm:text-sm" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
                     <div className="p-1.5 sm:p-2 rounded" style={{ backgroundColor: COLORS.uiBlue, color: 'white' }}>
@@ -1343,8 +1478,17 @@ export default function AdminPage() {
             config={config}
             onConfigChange={updateConfig}
             onGoToMaps={() => setActiveTab('maps')}
+            onSaveConfig={() => {
+              saveGameConfig(config as any);
+              setConfigSaved(true);
+              setTimeout(() => setConfigSaved(false), 2000);
+            }}
+            configSaved={configSaved}
           />
         )}
+
+        {/* Theme Tab */}
+        {activeTab === 'theme' && <AdminThemeTab />}
 
         {/* Stats Tab */}
         {activeTab === 'stats' && <AdminStatsTab />}

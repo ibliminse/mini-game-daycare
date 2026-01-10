@@ -11,10 +11,20 @@ export interface EditableRoom {
   type: 'hallway' | 'classroom' | 'office';
 }
 
+// ICE configuration for a level
+export interface EditableLevelIceConfig {
+  agentCount: number;
+  roomSearchProbability: number;
+  searchDuration: number;
+}
+
 // Editable level layout
 export interface EditableLevel {
+  id?: string;
   name: string;
   rooms: EditableRoom[];
+  iceConfig: EditableLevelIceConfig;
+  isCustom?: boolean;
 }
 
 // Editable config type
