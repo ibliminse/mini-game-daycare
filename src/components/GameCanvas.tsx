@@ -294,8 +294,8 @@ export default function GameCanvas() {
             {/* Star decoration */}
             <div className="absolute top-16 right-12 text-blue-300/30 text-sm">✦</div>
 
-            {/* Clipboard board */}
-            <div className="rounded-2xl p-4 pt-6" style={{ background: '#A0522D', border: '5px solid #8B4513' }}>
+            {/* Clipboard board - cork board style */}
+            <div className="rounded-2xl p-4 pt-6" style={{ background: '#C9A66B', border: '5px solid #A67B4B' }}>
               {/* Header Card - Blue */}
               <div className="rounded-xl p-4 mb-3 text-center relative" style={{ background: '#4A90D9' }}>
                 <div className="absolute top-3 left-4 text-yellow-300 text-xs">★</div>
