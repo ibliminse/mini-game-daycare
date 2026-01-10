@@ -70,6 +70,67 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
   if (activeWarning) {
     drawIceCountdown(ctx, activeWarning.countdown, time);
   }
+
+  // Debug overlay for ICE agents (enable with window.DEBUG_ICE = true)
+  if (typeof window !== 'undefined' && (window as unknown as Record<string, boolean>).DEBUG_ICE) {
+    drawIceDebugOverlay(ctx, state);
+  }
+}
+
+/**
+ * Draw debug overlay for ICE agents
+ */
+function drawIceDebugOverlay(ctx: CanvasRenderingContext2D, state: GameState): void {
+  ctx.save();
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+
+  // Draw hallway bounds
+  for (const room of state.building.rooms) {
+    if (room.type === 'hallway') {
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      ctx.strokeRect(room.bounds.x, room.bounds.y, room.bounds.width, room.bounds.height);
+      ctx.setLineDash([]);
+
+      // Label
+      ctx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+      ctx.fillText(room.id, room.bounds.x + 2, room.bounds.y + 12);
+    }
+  }
+
+  // Draw agent info
+  let yOffset = 20;
+  for (const agent of state.iceAgents) {
+    const status = agent.active ? 'ACTIVE' : 'INACTIVE';
+    const info = `${agent.id}: ${status} pos=(${agent.x.toFixed(0)},${agent.y.toFixed(0)}) dir=${agent.direction} state=${agent.state} hall=${agent.assignedHallwayId}`;
+
+    ctx.fillStyle = agent.active ? 'lime' : 'gray';
+    ctx.fillText(info, 10, yOffset);
+    yOffset += 12;
+
+    // Draw agent position marker
+    if (agent.active) {
+      ctx.beginPath();
+      ctx.arc(agent.x, agent.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 0, 255, 0.8)';
+      ctx.fill();
+
+      // Draw assigned hallway connection
+      const hallway = state.building.rooms.find(r => r.id === agent.assignedHallwayId);
+      if (hallway) {
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(agent.x, agent.y);
+        ctx.lineTo(hallway.bounds.x + hallway.bounds.width / 2, hallway.bounds.y + hallway.bounds.height / 2);
+        ctx.stroke();
+      }
+    }
+  }
+
+  ctx.restore();
 }
 
 /**
