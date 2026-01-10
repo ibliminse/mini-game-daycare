@@ -6,7 +6,7 @@ import { createInitialState, createInputState, createJoystickState } from '@/gam
 import { updateGame } from '@/game/update';
 import { render } from '@/game/render';
 import { setupKeyboardListeners } from '@/game/input';
-import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVELS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION } from '@/game/config';
+import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVEL_SPECS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION } from '@/game/config';
 import { resetIceTimer } from '@/game/update';
 import { Upgrades } from '@/game/types';
 
@@ -39,7 +39,7 @@ export default function GameCanvas() {
         if (progress.funding !== undefined) setPersistentFunding(progress.funding);
         // Validate saved level is within bounds (important when level count changes)
         if (progress.level !== undefined) {
-          const validLevel = Math.max(0, Math.min(progress.level, LEVELS.length - 1));
+          const validLevel = Math.max(0, Math.min(progress.level, LEVEL_SPECS.length - 1));
           setCurrentLevel(validLevel);
         }
       }
@@ -84,7 +84,7 @@ export default function GameCanvas() {
 
   // Advance to next level
   const handleNextLevel = useCallback(() => {
-    const nextLevel = Math.min(gameStateRef.current.level + 1, LEVELS.length - 1);
+    const nextLevel = Math.min(gameStateRef.current.level + 1, LEVEL_SPECS.length - 1);
     setCurrentLevel(nextLevel); // Update progression
     resetIceTimer();
     // Save accumulated funding
@@ -392,11 +392,11 @@ export default function GameCanvas() {
                    style={{ backgroundColor: COLORS.uiBlue }}>
                 <h2 className="font-bold text-center text-white"
                     style={{ fontFamily: systemFont }}>
-                  🏫 {LEVELS[currentLevel]?.name || 'Unknown'}
+                  🏫 {LEVEL_SPECS[currentLevel]?.name || 'Unknown'}
                 </h2>
                 <p className="text-xs text-center text-white/80"
                    style={{ fontFamily: systemFont }}>
-                  Level {currentLevel + 1} of {LEVELS.length}
+                  Level {currentLevel + 1} of {LEVEL_SPECS.length}
                 </p>
               </div>
 
@@ -437,7 +437,7 @@ export default function GameCanvas() {
                   backgroundColor: COLORS.uiBlue,
                   border: '3px solid #3070b8'
                 }}
-                aria-label={`Start game at level ${currentLevel + 1}: ${LEVELS[currentLevel]?.name || 'Unknown'}`}
+                aria-label={`Start game at level ${currentLevel + 1}: ${LEVEL_SPECS[currentLevel]?.name || 'Unknown'}`}
               >
                 ▶ START SHIFT
               </button>
@@ -470,10 +470,10 @@ export default function GameCanvas() {
             {/* Top bar - Level name and stats */}
             <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-1" role="status" aria-live="polite">
               {/* Left side stats */}
-              <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVELS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
+              <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVEL_SPECS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
-                  {LEVELS[displayState.level]?.name || 'Unknown'}
+                  {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
                 </div>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
                      style={{ backgroundColor: COLORS.uiGreen, fontFamily: systemFont }}>
@@ -743,7 +743,7 @@ export default function GameCanvas() {
               <div className="text-center mb-2">
                 <span className="px-3 py-1 text-sm font-bold text-white"
                       style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
-                  {LEVELS[displayState.level]?.name || 'Unknown'}
+                  {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
                 </span>
               </div>
 
@@ -753,14 +753,14 @@ export default function GameCanvas() {
                     color: isWin ? COLORS.uiGreen : COLORS.uiRed
                   }}>
                 {isWin
-                  ? (displayState.level >= LEVELS.length - 1 ? 'GAME COMPLETE!' : 'INSPECTION PASSED!')
+                  ? (displayState.level >= LEVEL_SPECS.length - 1 ? 'GAME COMPLETE!' : 'INSPECTION PASSED!')
                   : 'BUSTED!'}
               </h1>
 
               <p className="text-sm sm:text-base mb-3 sm:mb-4 text-center"
                  style={{ fontFamily: systemFont, color: COLORS.uiCrayon }}>
                 {isWin
-                  ? (displayState.level >= LEVELS.length - 1
+                  ? (displayState.level >= LEVEL_SPECS.length - 1
                       ? 'You saved all the daycares! Quality outcomes achieved.'
                       : 'Level complete! Ready for the next daycare?')
                   : 'An independent journalist caught you with ICE!'}
@@ -799,7 +799,7 @@ export default function GameCanvas() {
                 >
                   RETRY
                 </button>
-                {isWin && displayState.level < LEVELS.length - 1 && (
+                {isWin && displayState.level < LEVEL_SPECS.length - 1 && (
                   <button
                     onClick={handleNextLevel}
                     className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
@@ -808,7 +808,7 @@ export default function GameCanvas() {
                       backgroundColor: COLORS.uiBlue,
                       border: '3px solid #3070b8'
                     }}
-                    aria-label={`Go to next level: ${LEVELS[displayState.level + 1]?.name || 'Unknown'}`}
+                    aria-label={`Go to next level: ${LEVEL_SPECS[displayState.level + 1]?.name || 'Unknown'}`}
                   >
                     NEXT →
                   </button>

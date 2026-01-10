@@ -47,9 +47,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
   // Draw room labels
   drawRoomLabels(ctx, state);
 
-  // Draw ICE agent
-  if (state.iceAgent.active) {
-    drawIceAgent(ctx, state.iceAgent, time);
+  // Draw all active ICE agents
+  for (const agent of state.iceAgents) {
+    if (agent.active) {
+      drawIceAgent(ctx, agent, time);
+    }
   }
 
   // Draw warning banner if suspicion high
@@ -57,14 +59,16 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
     drawWarningBanner(ctx, time);
   }
 
-  // Draw ICE warning if agent is active
-  if (state.iceAgent.active) {
+  // Draw ICE warning if any agent is active
+  const anyAgentActive = state.iceAgents.some(a => a.active);
+  if (anyAgentActive) {
     drawIceWarning(ctx, time);
   }
 
-  // Draw ICE incoming warning countdown
-  if (state.iceWarning.active) {
-    drawIceCountdown(ctx, state.iceWarning.countdown, time);
+  // Draw ICE incoming warning countdown (show if any warning is active)
+  const activeWarning = state.iceWarnings.find(w => w.active);
+  if (activeWarning) {
+    drawIceCountdown(ctx, activeWarning.countdown, time);
   }
 }
 
@@ -597,13 +601,18 @@ function drawIceAgent(ctx: CanvasRenderingContext2D, ice: IceAgent, time: number
   ctx.save();
   ctx.translate(ice.x, ice.y);
 
-  // Flip based on direction
+  // Flip/rotate based on direction
   if (ice.direction === 'left') {
     ctx.scale(-1, 1);
+  } else if (ice.direction === 'up') {
+    ctx.rotate(-Math.PI / 2);
+  } else if (ice.direction === 'down') {
+    ctx.rotate(Math.PI / 2);
   }
 
-  // Walking animation
-  const walkCycle = Math.sin(time / 100) * 3;
+  // Walking animation (slower when searching)
+  const walkSpeed = ice.state === 'searching' ? 0 : 100;
+  const walkCycle = walkSpeed > 0 ? Math.sin(time / walkSpeed) * 3 : 0;
 
   // Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -675,14 +684,62 @@ function drawIceAgent(ctx: CanvasRenderingContext2D, ice: IceAgent, time: number
 
   ctx.restore();
 
+  // Draw "SEARCHING" indicator when agent is searching a room
+  if (ice.state === 'searching') {
+    drawSearchingIndicator(ctx, ice, time);
+  }
+
   // Draw vision cone (faint, to show danger zone)
   drawVisionCone(ctx, ice, time);
+}
+
+/**
+ * Draw indicator when ICE agent is searching a room
+ */
+function drawSearchingIndicator(ctx: CanvasRenderingContext2D, ice: IceAgent, time: number): void {
+  ctx.save();
+
+  const pulse = 0.7 + 0.3 * Math.sin(time / 100);
+
+  // Magnifying glass icon above agent
+  ctx.translate(ice.x, ice.y - 40);
+
+  // Glow effect
+  ctx.shadowColor = 'rgba(255, 200, 0, 0.8)';
+  ctx.shadowBlur = 10 * pulse;
+
+  // Glass circle
+  ctx.strokeStyle = `rgba(255, 200, 0, ${pulse})`;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Handle
+  ctx.beginPath();
+  ctx.moveTo(7, 7);
+  ctx.lineTo(14, 14);
+  ctx.stroke();
+
+  // "SEARCHING" text
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = `rgba(255, 200, 0, ${pulse})`;
+  ctx.font = 'bold 10px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('SEARCHING', 0, 25);
+
+  ctx.restore();
 }
 
 /**
  * Draw the ICE agent's vision cone
  */
 function drawVisionCone(ctx: CanvasRenderingContext2D, ice: IceAgent, time: number): void {
+  // Don't draw vision cone when searching a room
+  if (ice.state === 'searching' || ice.state === 'entering_room' || ice.state === 'exiting_room') {
+    return;
+  }
+
   ctx.save();
 
   const coneLength = ICE_AGENT.visionDistance;
@@ -693,29 +750,44 @@ function drawVisionCone(ctx: CanvasRenderingContext2D, ice: IceAgent, time: numb
 
   ctx.globalAlpha = pulse;
 
+  ctx.beginPath();
   if (ice.direction === 'right') {
-    // Cone pointing right
-    ctx.beginPath();
     ctx.moveTo(ice.x + 15, ice.y);
     ctx.lineTo(ice.x + 15 + coneLength, ice.y - coneWidth / 2);
     ctx.lineTo(ice.x + 15 + coneLength, ice.y + coneWidth / 2);
-    ctx.closePath();
-  } else {
-    // Cone pointing left
-    ctx.beginPath();
+  } else if (ice.direction === 'left') {
     ctx.moveTo(ice.x - 15, ice.y);
     ctx.lineTo(ice.x - 15 - coneLength, ice.y - coneWidth / 2);
     ctx.lineTo(ice.x - 15 - coneLength, ice.y + coneWidth / 2);
-    ctx.closePath();
+  } else if (ice.direction === 'down') {
+    ctx.moveTo(ice.x, ice.y + 25);
+    ctx.lineTo(ice.x - coneWidth / 2, ice.y + 25 + coneLength);
+    ctx.lineTo(ice.x + coneWidth / 2, ice.y + 25 + coneLength);
+  } else {
+    // up
+    ctx.moveTo(ice.x, ice.y - 25);
+    ctx.lineTo(ice.x - coneWidth / 2, ice.y - 25 - coneLength);
+    ctx.lineTo(ice.x + coneWidth / 2, ice.y - 25 - coneLength);
   }
+  ctx.closePath();
 
   // Gradient fill
-  const gradient = ctx.createLinearGradient(
-    ice.direction === 'right' ? ice.x : ice.x - coneLength,
-    ice.y,
-    ice.direction === 'right' ? ice.x + coneLength : ice.x,
-    ice.y
-  );
+  let gradient;
+  if (ice.direction === 'right' || ice.direction === 'left') {
+    gradient = ctx.createLinearGradient(
+      ice.direction === 'right' ? ice.x : ice.x - coneLength,
+      ice.y,
+      ice.direction === 'right' ? ice.x + coneLength : ice.x,
+      ice.y
+    );
+  } else {
+    gradient = ctx.createLinearGradient(
+      ice.x,
+      ice.direction === 'down' ? ice.y : ice.y - coneLength,
+      ice.x,
+      ice.direction === 'down' ? ice.y + coneLength : ice.y
+    );
+  }
   gradient.addColorStop(0, 'rgba(255, 0, 0, 0.4)');
   gradient.addColorStop(1, 'rgba(255, 0, 0, 0)');
 

@@ -1,8 +1,9 @@
 // Pure game update logic
 
-import { GameState, InputState, JoystickState, IceAgent } from './types';
+import { GameState, InputState, JoystickState, IceAgent, Room } from './types';
 import { getCombinedDirection } from './input';
 import { canPickupForm, isPlayerAtDesk, clampToWalkable, getRoomAtPosition } from './collisions';
+import { LEVEL_SPECS } from './levelSpec';
 import {
   FUNDING_PER_FORM,
   ENROLLMENT_PER_FORM,
@@ -12,13 +13,9 @@ import {
   MAX_SUSPICION,
   LOSE_THRESHOLD,
   CARRY_CAPACITY,
-  LEVELS,
   ICE_AGENT,
   SPRINT_SPEED_MULTIPLIER,
 } from './config';
-
-// Note: ICE spawn timing is now stored in GameState (timeSinceIceSpawn, nextIceSpawnTime)
-// This makes state management cleaner and more predictable
 
 /**
  * Deep clone game state
@@ -34,18 +31,16 @@ function cloneState(state: GameState): GameState {
       doors: state.building.doors.map((d) => ({ ...d, connects: [...d.connects] as [string, string] })),
     },
     desk: { ...state.desk },
-    iceAgent: { ...state.iceAgent },
-    iceWarning: { ...state.iceWarning },
+    iceAgents: state.iceAgents.map((a) => ({ ...a, returnPosition: a.returnPosition ? { ...a.returnPosition } : undefined })),
+    iceWarnings: state.iceWarnings.map((w) => ({ ...w })),
+    hallwaySpawnTimers: state.hallwaySpawnTimers.map((t) => ({ ...t })),
+    iceConfig: { ...state.iceConfig },
     upgrades: { ...state.upgrades },
-    sprintTimer: state.sprintTimer,
-    noIceTimer: state.noIceTimer,
-    timeSinceIceSpawn: state.timeSinceIceSpawn,
-    nextIceSpawnTime: state.nextIceSpawnTime,
   };
 }
 
 /**
- * Check if player is in the hallway (not safe from ICE)
+ * Check if player is in the hallway (not safe from ICE patrol)
  */
 function isPlayerInHallway(state: GameState): boolean {
   const room = getRoomAtPosition(state.player.x, state.player.y, state.building);
@@ -53,87 +48,327 @@ function isPlayerInHallway(state: GameState): boolean {
 }
 
 /**
- * Check if ICE agent can see the player using proper vision cone detection
- * ICE has a cone-shaped field of view in their facing direction
+ * Check if player is in a specific room
+ */
+function isPlayerInRoom(state: GameState, roomId: string): boolean {
+  const room = getRoomAtPosition(state.player.x, state.player.y, state.building);
+  return room?.id === roomId;
+}
+
+/**
+ * Get hallway bounds by ID
+ */
+function getHallwayBounds(state: GameState, hallwayId: string): Room | undefined {
+  return state.building.rooms.find((r) => r.id === hallwayId && r.type === 'hallway');
+}
+
+/**
+ * Check if ICE agent can see the player using vision cone detection
  */
 function canIceSeePlayer(ice: IceAgent, playerX: number, playerY: number): boolean {
-  if (!ice.active) return false;
+  if (!ice.active || ice.state !== 'patrolling') return false;
 
-  // Calculate distance to player
   const dx = playerX - ice.x;
   const dy = playerY - ice.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
 
-  // Check if player is within vision distance
   if (distance > ICE_AGENT.visionDistance) return false;
 
-  // Calculate angle to player (in radians)
   const angleToPlayer = Math.atan2(dy, dx);
 
-  // Calculate ICE facing direction (in radians)
-  // Right = 0, Left = PI
-  const facingAngle = ice.direction === 'right' ? 0 : Math.PI;
+  // Calculate facing angle based on direction
+  let facingAngle: number;
+  switch (ice.direction) {
+    case 'right': facingAngle = 0; break;
+    case 'left': facingAngle = Math.PI; break;
+    case 'up': facingAngle = -Math.PI / 2; break;
+    case 'down': facingAngle = Math.PI / 2; break;
+  }
 
-  // Calculate angle difference (normalize to -PI to PI)
   let angleDiff = angleToPlayer - facingAngle;
   while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
   while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
 
-  // Check if player is within vision cone
-  // visionAngle is total cone width (60 degrees = 30 degrees each side)
   const halfConeAngle = (ICE_AGENT.visionAngle / 2) * (Math.PI / 180);
-
   return Math.abs(angleDiff) <= halfConeAngle;
 }
 
 /**
- * Spawn ICE agent at edge of hallway
+ * Spawn an ICE agent for a specific hallway
  */
-function spawnIceAgent(state: GameState): IceAgent {
-  // Clamp level index to valid range
-  const validIndex = Math.max(0, Math.min(state.level, LEVELS.length - 1));
-  const level = LEVELS[validIndex];
-  const hallway = level.hallway;
+function spawnIceAgentForHallway(agent: IceAgent, state: GameState): void {
+  const hallway = getHallwayBounds(state, agent.assignedHallwayId);
+  if (!hallway) return;
 
-  // Randomly spawn from left or right
-  const fromLeft = Math.random() > 0.5;
+  const bounds = hallway.bounds;
+  const isHorizontal = bounds.width > bounds.height;
 
-  return {
-    x: fromLeft ? hallway.x - 20 : hallway.x + hallway.width + 20,
-    y: hallway.y + hallway.height / 2,
-    direction: fromLeft ? 'right' : 'left',
-    active: true,
-    timer: ICE_AGENT.duration,
-    speed: ICE_AGENT.speed,
-  };
+  if (isHorizontal) {
+    // Horizontal hallway - spawn from left or right
+    const fromLeft = Math.random() > 0.5;
+    agent.x = fromLeft ? bounds.x - 20 : bounds.x + bounds.width + 20;
+    agent.y = bounds.y + bounds.height / 2;
+    agent.direction = fromLeft ? 'right' : 'left';
+  } else {
+    // Vertical hallway - spawn from top or bottom
+    const fromTop = Math.random() > 0.5;
+    agent.x = bounds.x + bounds.width / 2;
+    agent.y = fromTop ? bounds.y - 20 : bounds.y + bounds.height + 20;
+    agent.direction = fromTop ? 'down' : 'up';
+  }
+
+  agent.active = true;
+  agent.timer = ICE_AGENT.duration;
+  agent.state = 'patrolling';
+  agent.targetRoomId = undefined;
+  agent.searchTimer = undefined;
+  agent.returnPosition = undefined;
 }
 
 /**
- * Update ICE agent movement and state
+ * Update a single ICE agent's patrol movement
  */
-function updateIceAgent(state: GameState, dt: number): void {
-  const ice = state.iceAgent;
-  // Clamp level index to valid range
-  const validIndex = Math.max(0, Math.min(state.level, LEVELS.length - 1));
-  const level = LEVELS[validIndex];
-  const hallway = level.hallway;
+function updateIceAgentPatrol(agent: IceAgent, state: GameState, dt: number): void {
+  const hallway = getHallwayBounds(state, agent.assignedHallwayId);
+  if (!hallway) return;
 
-  if (ice.active) {
-    // Move in facing direction
-    const moveX = ice.direction === 'right' ? ice.speed * dt : -ice.speed * dt;
-    ice.x += moveX;
+  const bounds = hallway.bounds;
+  const isHorizontal = bounds.width > bounds.height;
 
-    // Deactivate when ICE reaches the other side of hallway
-    const reachedEnd = ice.direction === 'right'
-      ? ice.x > hallway.x + hallway.width + 50  // Walked past right edge
-      : ice.x < hallway.x - 50;                  // Walked past left edge
+  // Move in facing direction
+  const speed = agent.speed * dt;
+  switch (agent.direction) {
+    case 'right': agent.x += speed; break;
+    case 'left': agent.x -= speed; break;
+    case 'down': agent.y += speed; break;
+    case 'up': agent.y -= speed; break;
+  }
 
-    if (reachedEnd) {
-      ice.active = false;
-      ice.x = -100;
-      // Note: spawn timing is now reset in updateGame using state fields
+  // Check if agent has left the hallway
+  let reachedEnd = false;
+  if (isHorizontal) {
+    reachedEnd = agent.direction === 'right'
+      ? agent.x > bounds.x + bounds.width + 50
+      : agent.x < bounds.x - 50;
+  } else {
+    reachedEnd = agent.direction === 'down'
+      ? agent.y > bounds.y + bounds.height + 50
+      : agent.y < bounds.y - 50;
+  }
+
+  if (reachedEnd) {
+    agent.active = false;
+    agent.x = -100;
+    agent.y = -100;
+  }
+}
+
+/**
+ * Check if agent should search a room (random chance)
+ */
+function shouldSearchRoom(state: GameState): boolean {
+  // Per-frame probability based on level config
+  const probability = state.iceConfig.roomSearchProbability;
+  return Math.random() < probability * 0.02; // ~2% per frame at max probability
+}
+
+/**
+ * Find a random adjacent classroom to search
+ */
+function findAdjacentRoom(agent: IceAgent, state: GameState): Room | null {
+  const hallway = getHallwayBounds(state, agent.assignedHallwayId);
+  if (!hallway) return null;
+
+  // Find classrooms adjacent to this hallway
+  const classrooms = state.building.rooms.filter((r) => r.type === 'classroom');
+  const adjacentRooms: Room[] = [];
+
+  for (const room of classrooms) {
+    // Check if room is adjacent to hallway (within 50px)
+    const hBounds = hallway.bounds;
+    const rBounds = room.bounds;
+
+    const horizontalOverlap =
+      rBounds.x < hBounds.x + hBounds.width + 50 &&
+      rBounds.x + rBounds.width > hBounds.x - 50;
+    const verticalOverlap =
+      rBounds.y < hBounds.y + hBounds.height + 50 &&
+      rBounds.y + rBounds.height > hBounds.y - 50;
+
+    if (horizontalOverlap && verticalOverlap) {
+      adjacentRooms.push(room);
     }
   }
+
+  if (adjacentRooms.length === 0) return null;
+  return adjacentRooms[Math.floor(Math.random() * adjacentRooms.length)];
+}
+
+/**
+ * Update ICE agent room search behavior
+ */
+function updateIceAgentSearch(agent: IceAgent, state: GameState, dt: number): void {
+  if (!agent.active) return;
+
+  switch (agent.state) {
+    case 'patrolling':
+      updateIceAgentPatrol(agent, state, dt);
+
+      // Maybe start searching a room
+      if (shouldSearchRoom(state)) {
+        const room = findAdjacentRoom(agent, state);
+        if (room) {
+          agent.state = 'entering_room';
+          agent.targetRoomId = room.id;
+          agent.returnPosition = { x: agent.x, y: agent.y };
+        }
+      }
+      break;
+
+    case 'entering_room':
+      if (agent.targetRoomId) {
+        const room = state.building.rooms.find((r) => r.id === agent.targetRoomId);
+        if (room) {
+          // Move toward room center
+          const targetX = room.bounds.x + room.bounds.width / 2;
+          const targetY = room.bounds.y + room.bounds.height / 2;
+          const dx = targetX - agent.x;
+          const dy = targetY - agent.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 20) {
+            // Reached room, start searching
+            agent.state = 'searching';
+            agent.searchTimer = state.iceConfig.searchDuration;
+          } else {
+            // Move toward room
+            const speed = agent.speed * dt * 0.8; // Slightly slower when searching
+            agent.x += (dx / dist) * speed;
+            agent.y += (dy / dist) * speed;
+          }
+        }
+      }
+      break;
+
+    case 'searching':
+      if (agent.searchTimer !== undefined) {
+        agent.searchTimer -= dt;
+        if (agent.searchTimer <= 0) {
+          agent.state = 'exiting_room';
+        }
+      }
+      break;
+
+    case 'exiting_room':
+      if (agent.returnPosition) {
+        const dx = agent.returnPosition.x - agent.x;
+        const dy = agent.returnPosition.y - agent.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 20) {
+          // Returned to hallway, resume patrol
+          agent.state = 'patrolling';
+          agent.targetRoomId = undefined;
+          agent.returnPosition = undefined;
+        } else {
+          const speed = agent.speed * dt * 0.8;
+          agent.x += (dx / dist) * speed;
+          agent.y += (dy / dist) * speed;
+        }
+      } else {
+        // No return position, just resume
+        agent.state = 'patrolling';
+      }
+      break;
+  }
+}
+
+// Fix the parameter order in updateIceAgentPatrol call
+function updateIceAgentPatrol2(agent: IceAgent, dt: number, state: GameState): void {
+  updateIceAgentPatrol(agent, state, dt);
+}
+
+/**
+ * Update all ICE agents
+ */
+function updateAllIceAgents(state: GameState, dt: number): boolean {
+  let playerCaught = false;
+
+  // Skip if noIce protection is active
+  if (state.noIceTimer > 0) {
+    // Clear all agents and warnings
+    for (const agent of state.iceAgents) {
+      if (agent.active) {
+        agent.active = false;
+        agent.x = -100;
+        agent.y = -100;
+      }
+    }
+    for (const warning of state.iceWarnings) {
+      warning.active = false;
+    }
+    for (const timer of state.hallwaySpawnTimers) {
+      timer.timeSinceSpawn = 0;
+    }
+    return false;
+  }
+
+  // Update spawn timers and warnings for each agent
+  for (let i = 0; i < state.iceAgents.length; i++) {
+    const agent = state.iceAgents[i];
+    const warning = state.iceWarnings[i];
+    const timer = state.hallwaySpawnTimers[i];
+
+    if (!agent.active) {
+      timer.timeSinceSpawn += dt;
+
+      // Warning countdown
+      if (warning.active) {
+        warning.countdown -= dt;
+        if (warning.countdown <= 0) {
+          warning.active = false;
+          spawnIceAgentForHallway(agent, state);
+        }
+      } else if (timer.timeSinceSpawn >= timer.nextSpawnTime) {
+        // Start warning
+        warning.active = true;
+        warning.countdown = ICE_AGENT.warningTime;
+      }
+    } else {
+      // Update active agent
+      const wasActive = agent.active;
+
+      if (state.iceConfig.roomSearchProbability > 0) {
+        updateIceAgentSearch(agent, state, dt);
+      } else {
+        updateIceAgentPatrol(agent, state, dt);
+      }
+
+      // Reset spawn timer if agent just became inactive
+      if (wasActive && !agent.active) {
+        timer.timeSinceSpawn = 0;
+        timer.nextSpawnTime = ICE_AGENT.spawnInterval + (Math.random() - 0.5) * 5;
+      }
+
+      // Check for player detection
+      if (agent.active) {
+        // Patrolling in hallway - check if player is in hallway
+        if (agent.state === 'patrolling' && isPlayerInHallway(state)) {
+          if (canIceSeePlayer(agent, state.player.x, state.player.y)) {
+            playerCaught = true;
+          }
+        }
+        // Searching room - check if player is in same room
+        if (agent.state === 'searching' && agent.targetRoomId) {
+          if (isPlayerInRoom(state, agent.targetRoomId)) {
+            playerCaught = true;
+          }
+        }
+      }
+    }
+  }
+
+  return playerCaught;
 }
 
 /**
@@ -189,49 +424,12 @@ export function updateGame(
     newState.noIceTimer = Math.max(0, newState.noIceTimer - dt);
   }
 
-  // ICE Agent logic with warning system (skip if noIce protection active)
-  if (newState.noIceTimer > 0) {
-    // Clear any active ICE or warnings during protection
-    if (newState.iceAgent.active) {
-      newState.iceAgent.active = false;
-      newState.iceAgent.x = -100;
-    }
-    newState.iceWarning.active = false;
-    newState.timeSinceIceSpawn = 0;
-  } else {
-    newState.timeSinceIceSpawn += dt;
-
-    // Warning countdown before ICE spawns
-    if (newState.iceWarning.active) {
-      newState.iceWarning.countdown -= dt;
-      if (newState.iceWarning.countdown <= 0) {
-        // Warning over, spawn ICE agent
-        newState.iceWarning.active = false;
-        newState.iceAgent = spawnIceAgent(newState);
-      }
-    } else if (!newState.iceAgent.active && newState.timeSinceIceSpawn >= newState.nextIceSpawnTime) {
-      // Start warning countdown
-      newState.iceWarning.active = true;
-      newState.iceWarning.countdown = ICE_AGENT.warningTime;
-    }
-
-    if (newState.iceAgent.active) {
-      const wasActive = newState.iceAgent.active;
-      updateIceAgent(newState, dt);
-
-      // Reset spawn timer if ICE just became inactive
-      if (wasActive && !newState.iceAgent.active) {
-        newState.timeSinceIceSpawn = 0;
-        newState.nextIceSpawnTime = ICE_AGENT.spawnInterval + (Math.random() - 0.5) * 5;
-      }
-
-      // Check if ICE sees player in hallway
-      if (newState.iceAgent.active && isPlayerInHallway(newState) && canIceSeePlayer(newState.iceAgent, newState.player.x, newState.player.y)) {
-        // Caught! Instant lose - journalist catches you with ICE
-        newState.phase = 'lose';
-        newState.player.stress = 1;
-      }
-    }
+  // Update all ICE agents
+  const playerCaught = updateAllIceAgents(newState, dt);
+  if (playerCaught) {
+    newState.phase = 'lose';
+    newState.player.stress = 1;
+    return newState;
   }
 
   // Check form pickups
@@ -269,7 +467,7 @@ export function updateGame(
   // Update timer
   newState.timeRemaining -= dt;
 
-  // Passive suspicion increase (pressure mounts!) - only if not already at max
+  // Passive suspicion increase (pressure mounts!)
   if (newState.suspicion < MAX_SUSPICION) {
     newState.suspicion += PASSIVE_SUSPICION_RATE * dt;
   }
@@ -277,15 +475,12 @@ export function updateGame(
   // Clamp suspicion (0 to 100)
   newState.suspicion = Math.min(MAX_SUSPICION, Math.max(0, newState.suspicion));
 
-  // Check win/lose conditions - ONLY when time runs out
+  // Check win/lose conditions when time runs out
   if (newState.timeRemaining <= 0) {
     newState.timeRemaining = 0;
-    // Time's up! Check if suspicion is low enough (need to be at or below threshold to win)
     if (newState.suspicion > LOSE_THRESHOLD) {
-      // Still too suspicious - journalist catches you
       newState.phase = 'lose';
     } else {
-      // Suspicion low enough - you passed!
       newState.phase = 'win';
     }
   }
@@ -314,11 +509,8 @@ function respawnForms(state: GameState): void {
 }
 
 /**
- * Reset ICE spawn timer (call when starting new game)
- * Note: ICE timing is now part of GameState and initialized in createInitialState.
- * This function is kept for backwards compatibility but is now a no-op.
+ * Reset ICE spawn timer (kept for backwards compatibility)
  */
 export function resetIceTimer(): void {
-  // No-op: ICE timing is now handled in GameState (timeSinceIceSpawn, nextIceSpawnTime)
-  // These values are initialized in createInitialState()
+  // No-op: ICE timing is now per-hallway in GameState
 }

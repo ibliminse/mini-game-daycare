@@ -108,6 +108,10 @@ export const ICE_AGENT = {
   visionAngle: 60, // degrees field of view (30 each side)
 };
 
+// Re-export new level system
+export { LEVEL_SPECS, getLevelSpec, createBlankLevelSpec } from './levelSpec';
+export type { LevelSpec, HallwaySpec, RoomSpec, IceConfig } from './levelSpec';
+
 // Level Layouts - All fit within 1000x600 canvas
 // Each room must be adjacent to a hallway (within 30px gap)
 export const LEVELS = [

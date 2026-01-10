@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { LEVELS, COLORS, UPGRADE_COSTS, INSPECTION_TIME, ICE_AGENT, FORMS_PER_ROOM, CARRY_CAPACITY, MAX_CARRY_CAPACITY, SUSPICION_REDUCTION_PER_FORM, INITIAL_SUSPICION, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION, SPRINT_SPEED_MULTIPLIER, PLAYER_SPEED, MAP_WIDTH, MAP_HEIGHT } from '@/game/config';
+import { LEVEL_SPECS, COLORS, UPGRADE_COSTS, INSPECTION_TIME, ICE_AGENT, FORMS_PER_ROOM, CARRY_CAPACITY, MAX_CARRY_CAPACITY, SUSPICION_REDUCTION_PER_FORM, INITIAL_SUSPICION, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION, SPRINT_SPEED_MULTIPLIER, PLAYER_SPEED, MAP_WIDTH, MAP_HEIGHT } from '@/game/config';
 import { createInputState, createJoystickState } from '@/game/init';
 import { updateGame, resetIceTimer } from '@/game/update';
 import { render } from '@/game/render';
@@ -129,38 +129,23 @@ export default function AdminPage() {
     checkAuth();
   }, []);
 
-  // Convert a LEVELS entry to editable format
+  // Convert a LEVEL_SPECS entry to editable format
   const levelToEditable = useCallback((levelIndex: number): EditableLevel => {
-    const level = LEVELS[levelIndex];
+    const level = LEVEL_SPECS[levelIndex];
     const rooms: EditableRoom[] = [];
 
-    // Add main hallway
-    rooms.push({
-      id: 'hallway',
-      name: 'Hallway',
-      x: level.hallway.x,
-      y: level.hallway.y,
-      width: level.hallway.width,
-      height: level.hallway.height,
-      type: 'hallway',
-    });
-
-    // Add additional hallways
-    if ('hallway2' in level && level.hallway2) {
-      const h2 = level.hallway2 as { x: number; y: number; width: number; height: number };
-      rooms.push({ id: 'hallway2', name: 'Hallway 2', x: h2.x, y: h2.y, width: h2.width, height: h2.height, type: 'hallway' });
-    }
-    if ('hallway3' in level && level.hallway3) {
-      const h3 = level.hallway3 as { x: number; y: number; width: number; height: number };
-      rooms.push({ id: 'hallway3', name: 'Hallway 3', x: h3.x, y: h3.y, width: h3.width, height: h3.height, type: 'hallway' });
-    }
-    if ('hallway4' in level && level.hallway4) {
-      const h4 = level.hallway4 as { x: number; y: number; width: number; height: number };
-      rooms.push({ id: 'hallway4', name: 'Hallway 4', x: h4.x, y: h4.y, width: h4.width, height: h4.height, type: 'hallway' });
-    }
-    if ('hallway5' in level && level.hallway5) {
-      const h5 = level.hallway5 as { x: number; y: number; width: number; height: number };
-      rooms.push({ id: 'hallway5', name: 'Hallway 5', x: h5.x, y: h5.y, width: h5.width, height: h5.height, type: 'hallway' });
+    // Add all hallways from the array
+    for (let i = 0; i < level.hallways.length; i++) {
+      const hallway = level.hallways[i];
+      rooms.push({
+        id: hallway.id,
+        name: i === 0 ? 'Hallway' : `Hallway ${i + 1}`,
+        x: hallway.x,
+        y: hallway.y,
+        width: hallway.width,
+        height: hallway.height,
+        type: 'hallway',
+      });
     }
 
     // Add classrooms
@@ -546,6 +531,36 @@ export default function AdminPage() {
       const startX = hallway ? hallway.x + 50 : 100;
       const startY = hallway ? hallway.y + hallway.height / 2 : 300;
 
+      // Create ICE agents based on the number of hallways
+      const hallways = fittedLevel.rooms.filter(r => r.type === 'hallway');
+      const levelSpec = LEVEL_SPECS[selectedLevel];
+      const agentCount = Math.min(levelSpec?.iceConfig?.agentCount || 1, hallways.length);
+
+      const iceAgents = [];
+      const iceWarnings = [];
+      const hallwaySpawnTimers = [];
+
+      for (let i = 0; i < agentCount; i++) {
+        const h = hallways[i];
+        iceAgents.push({
+          id: `ice-${i}`,
+          x: -100,
+          y: 0,
+          direction: 'right' as const,
+          active: false,
+          timer: 0,
+          speed: config.iceSpeed,
+          assignedHallwayId: h?.id || `hallway-${i}`,
+          state: 'patrolling' as const,
+        });
+        iceWarnings.push({ active: false, countdown: 0 });
+        hallwaySpawnTimers.push({
+          hallwayId: h?.id || `hallway-${i}`,
+          timeSinceSpawn: 0,
+          nextSpawnTime: config.iceSpawnInterval + i * 5 + Math.random() * 5,
+        });
+      }
+
       gameStateRef.current = {
         phase: 'playing',
         player: {
@@ -560,8 +575,14 @@ export default function AdminPage() {
         forms,
         building,
         desk: office ? { x: office.x + 40, y: office.y + 60, width: 100, height: 80 } : { x: 40, y: 60, width: 100, height: 80 },
-        iceAgent: { x: -100, y: 0, direction: 'right', active: false, timer: 0, speed: config.iceSpeed },
-        iceWarning: { active: false, countdown: 0 },
+        iceAgents,
+        iceWarnings,
+        hallwaySpawnTimers,
+        iceConfig: {
+          agentCount,
+          roomSearchProbability: levelSpec?.iceConfig?.roomSearchProbability || 0,
+          searchDuration: levelSpec?.iceConfig?.searchDuration || 3,
+        },
         enrollments: 0,
         funding: 0,
         totalFunding: 0,
@@ -571,8 +592,6 @@ export default function AdminPage() {
         upgrades: { carryCapacity: 0 },
         sprintTimer: 0,
         noIceTimer: 0,
-        timeSinceIceSpawn: 0,
-        nextIceSpawnTime: config.iceSpawnInterval + Math.random() * 5,
       };
     } else {
       const { createInitialState } = require('@/game/init');
@@ -772,7 +791,7 @@ export default function AdminPage() {
               ← Back
             </button>
             <h1 className="text-sm sm:text-lg font-bold text-white truncate max-w-[150px] sm:max-w-none" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-              🎮 {LEVELS[selectedLevel].name}
+              🎮 {LEVEL_SPECS[selectedLevel].name}
             </h1>
           </div>
           <button
@@ -981,10 +1000,10 @@ export default function AdminPage() {
             {/* Level List */}
             <div className="p-3 sm:p-4 rounded-lg lg:w-1/3 lg:min-w-[280px]" style={{ backgroundColor: COLORS.uiPaper }}>
               <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-                All Levels ({LEVELS.length})
+                All Levels ({LEVEL_SPECS.length})
               </h2>
               <div className="space-y-2 max-h-[300px] lg:max-h-[500px] overflow-y-auto">
-                {LEVELS.map((level, index) => (
+                {LEVEL_SPECS.map((level, index) => (
                   <button
                     key={index}
                     onClick={() => handleSelectLevel(index)}

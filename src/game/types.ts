@@ -62,13 +62,35 @@ export interface Desk {
   height: number;
 }
 
+/**
+ * ICE agent behavior states for room search mechanic
+ */
+export type IceAgentState = 'patrolling' | 'entering_room' | 'searching' | 'exiting_room';
+
 export interface IceAgent {
+  id: string;                    // Unique ID for tracking
   x: number;
   y: number;
-  direction: 'left' | 'right';
+  direction: 'left' | 'right' | 'up' | 'down';
   active: boolean;
-  timer: number; // seconds remaining
+  timer: number;                 // seconds remaining
   speed: number;
+  assignedHallwayId: string;     // Which hallway this agent patrols
+
+  // Room search state
+  state: IceAgentState;
+  targetRoomId?: string;         // Room being searched
+  searchTimer?: number;          // Time remaining in search
+  returnPosition?: { x: number; y: number }; // Position to return to after search
+}
+
+/**
+ * Per-hallway spawn timing
+ */
+export interface HallwaySpawnTimer {
+  hallwayId: string;
+  timeSinceSpawn: number;
+  nextSpawnTime: number;
 }
 
 export interface Building {
@@ -92,20 +114,28 @@ export interface GameState {
   forms: Form[];
   building: Building;
   desk: Desk;
-  iceAgent: IceAgent;
-  iceWarning: IceWarning;
+
+  // Multi-ICE agent system
+  iceAgents: IceAgent[];              // Array of agents (1 per hallway, max 3)
+  iceWarnings: IceWarning[];          // Per-hallway warnings
+  hallwaySpawnTimers: HallwaySpawnTimer[]; // Per-hallway spawn timing
+
+  // Level ICE configuration
+  iceConfig: {
+    agentCount: number;
+    roomSearchProbability: number;
+    searchDuration: number;
+  };
+
   enrollments: number;
   funding: number;
-  totalFunding: number; // accumulated across games for upgrades
+  totalFunding: number;               // accumulated across games for upgrades
   suspicion: number;
   timeRemaining: number;
   level: number;
   upgrades: Upgrades;
-  sprintTimer: number; // seconds remaining of sprint
-  noIceTimer: number; // seconds remaining of no-ICE protection
-  // ICE spawn timing (moved from module-level)
-  timeSinceIceSpawn: number;
-  nextIceSpawnTime: number;
+  sprintTimer: number;                // seconds remaining of sprint
+  noIceTimer: number;                 // seconds remaining of no-ICE protection
 }
 
 export interface InputState {
