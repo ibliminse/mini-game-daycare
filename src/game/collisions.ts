@@ -68,7 +68,7 @@ export function isPositionWalkable(
   for (const door of building.doors) {
     // Door zones need to be significantly expanded to bridge room-hallway gaps
     // The gap between room/hallway inner bounds and door can be 20-30px on each side
-    const expansion = 30;
+    const expansion = 22;
     const doorBounds = {
       x: door.x - expansion,
       y: door.y - expansion,
