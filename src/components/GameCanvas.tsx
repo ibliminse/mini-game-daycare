@@ -276,30 +276,32 @@ export default function GameCanvas() {
              style={{ background: '#B8D4E8' }}>
           {/* Clipboard */}
           <div className="relative w-full max-w-[420px] fade-in">
-            {/* Clipboard decorations */}
-            <div className="absolute -top-2 left-4 w-5 h-5 rounded-full" style={{ background: '#4A90D9' }} />
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full" style={{ background: '#4A90D9' }} />
-            <div className="absolute -top-2 right-4 w-5 h-5 rounded-full bg-white" />
-            <div className="absolute top-16 -right-1 w-3 h-12 rounded-sm rotate-12"
-                 style={{ background: 'linear-gradient(180deg, #d4a574 0%, #c4956a 50%, #ff6b6b 50%, #ff6b6b 100%)' }} />
-            <div className="absolute top-8 right-8 text-blue-300/50 text-sm">✦</div>
+            {/* Clipboard decorations - pins */}
+            <div className="absolute -top-2 left-6 w-6 h-6 rounded-full z-10" style={{ background: '#4A90D9' }} />
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full z-10" style={{ background: '#4A90D9' }} />
+            <div className="absolute -top-2 right-6 w-6 h-6 rounded-full bg-white z-10" />
+            {/* Pencil */}
+            <div className="absolute top-20 -right-2 w-3 h-16 rounded-sm rotate-12 z-10"
+                 style={{ background: 'linear-gradient(180deg, #d4a574 0%, #c9a06a 60%, #e74c3c 60%, #c0392b 100%)' }} />
+            {/* Star decoration */}
+            <div className="absolute top-12 right-10 text-blue-300/40 text-xs">✦</div>
 
             {/* Clipboard board */}
-            <div className="rounded-2xl p-4 pt-6" style={{ background: '#B87333', border: '4px solid #8B4513' }}>
-              {/* Header Card */}
+            <div className="rounded-2xl p-4 pt-6" style={{ background: '#A0522D', border: '5px solid #8B4513' }}>
+              {/* Header Card - Blue */}
               <div className="rounded-xl p-4 mb-3 text-center relative" style={{ background: '#4A90D9' }}>
-                <div className="absolute top-2 left-3 text-yellow-300 text-sm">★</div>
-                <div className="absolute top-2 right-3 text-blue-200/40 text-xs">✦</div>
-                <h1 className="text-3xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
+                <div className="absolute top-3 left-4 text-yellow-300 text-xs">★</div>
+                <div className="absolute top-3 right-4 text-blue-200/30 text-xs">✦</div>
+                <h1 className="text-4xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
                   Learing™
                 </h1>
-                <p className="text-white/90 text-sm font-medium">Somali Daycare Simulator</p>
-                <p className="text-white/70 text-xs mt-1">&quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity</p>
+                <p className="text-white text-base font-medium mt-1">Somali Daycare Simulator</p>
+                <p className="text-white/60 text-sm mt-1">&quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity</p>
               </div>
 
-              {/* How to Play Card */}
-              <div className="rounded-xl p-3 mb-3" style={{ background: '#FFD93D' }}>
-                <h2 className="text-gray-800 font-bold text-sm mb-2 flex items-center justify-center gap-2">
+              {/* How to Play Card - Yellow */}
+              <div className="rounded-xl p-4 mb-3" style={{ background: '#FFD93D' }}>
+                <h2 className="text-gray-800 font-bold text-base mb-3 flex items-center justify-center gap-2">
                   <span className="text-lg">📋</span> How to Play
                 </h2>
                 <ul className="text-gray-700 text-sm space-y-1">
@@ -310,75 +312,71 @@ export default function GameCanvas() {
                 </ul>
               </div>
 
-              {/* Pink Banner */}
-              <div className="rounded-lg p-2 mb-3 text-center" style={{ background: '#FFB6C1' }}>
-                <p className="text-red-600 text-sm font-medium">
+              {/* Pink Banner - with tilted text */}
+              <div className="rounded-lg p-2 mb-3 text-center overflow-hidden" style={{ background: '#FFB6C1' }}>
+                <p className="text-red-500 text-sm font-medium" style={{ transform: 'rotate(-2deg)' }}>
                   ❄️ ICE agents have NO jurisdiction over love ❄️
                 </p>
               </div>
 
-              {/* Level Card */}
+              {/* Level Card - Blue */}
               <div className="rounded-xl p-3 mb-3 text-center" style={{ background: '#4A90D9' }}>
-                <p className="text-white font-bold text-lg flex items-center justify-center gap-2">
+                <p className="text-white font-bold text-xl flex items-center justify-center gap-2">
                   <span>🏫</span> {LEVEL_SPECS[currentLevel]?.name || 'Unknown'}
                 </p>
-                <p className="text-white/80 text-sm">Level {currentLevel + 1} of {LEVEL_SPECS.length}</p>
+                <p className="text-white/70 text-sm">Level {currentLevel + 1} of {LEVEL_SPECS.length}</p>
               </div>
 
-              {/* Upgrades Card */}
-              <div className="rounded-xl p-3 mb-3" style={{ background: '#5BC67E' }}>
+              {/* Upgrades Card - Teal/Green */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: '#3CB371' }}>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-800 font-bold text-sm flex items-center gap-1">
                     <span>💰</span> Upgrades
                   </span>
-                  <span className="px-3 py-1 bg-blue-500 rounded-lg text-white text-sm font-bold">
+                  <span className="px-3 py-1 rounded-lg text-white text-sm font-bold" style={{ background: '#4A90D9' }}>
                     ${persistentFunding}
                   </span>
                 </div>
                 <button
                   onClick={handleBuyCapacity}
                   disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
-                  className={`w-full p-2 rounded-lg font-bold text-sm transition-all ${
-                    persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
-                      ? 'bg-emerald-300 text-emerald-700 hover:bg-emerald-200 active:scale-[0.98]'
-                      : 'bg-emerald-300/50 text-emerald-600/50 cursor-not-allowed'
-                  }`}
+                  className="w-full p-2.5 rounded-lg font-bold text-sm transition-all active:scale-[0.98]"
+                  style={{
+                    background: persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                      ? '#5DECA5' : '#5DECA580',
+                    color: persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                      ? '#1a7a4c' : '#1a7a4c80',
+                    cursor: persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                      ? 'pointer' : 'not-allowed',
+                  }}
                 >
                   +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
                 </button>
               </div>
 
-              {/* Start Button - with border frame */}
-              <div className="rounded-xl p-1" style={{ background: '#4A90D9' }}>
+              {/* Start Button - Blue with border frame */}
+              <div className="rounded-xl p-1.5" style={{ background: '#3A7BC8' }}>
                 <button
                   onClick={handleStart}
-                  className="w-full py-4 text-white text-xl font-black rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  style={{ background: '#5B9FE8' }}
+                  className="w-full py-4 text-white text-2xl font-black rounded-lg transition-all hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: '#4A90D9' }}
                 >
                   ▶ START SHIFT
                 </button>
               </div>
 
-              {/* Footer */}
-              <p className="text-white text-sm text-center mt-3 font-bold">
+              {/* Footer text */}
+              <p className="text-white text-sm text-center mt-4 font-bold">
                 Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
               </p>
-              <p className="text-white/70 text-xs text-center mt-1 italic">
+              <p className="text-white/60 text-xs text-center mt-1 italic">
                 &quot;They can deport people, but they can&apos;t deport community&quot;
               </p>
 
-              {/* Music Toggle */}
-              <button
-                onClick={toggleMute}
-                className="w-full mt-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
-                style={{ background: isMuted ? 'rgba(255,255,255,0.2)' : '#4A90D9', color: 'white' }}
-              >
-                {isMuted ? '🔇 Music Off' : '🎵 Music On'}
-              </button>
-
+              {/* Reset Progress link */}
               <button
                 onClick={handleResetProgress}
-                className="w-full mt-2 py-2 text-white/50 text-xs hover:text-white/80 transition-colors underline"
+                className="w-full mt-4 py-1 text-white/40 text-xs hover:text-white/70 transition-colors underline"
               >
                 Reset Progress
               </button>
