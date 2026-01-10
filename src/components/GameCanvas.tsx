@@ -9,6 +9,7 @@ import { setupKeyboardListeners } from '@/game/input';
 import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVEL_SPECS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION } from '@/game/config';
 import { resetIceTimer } from '@/game/update';
 import { Upgrades } from '@/game/types';
+import { useAudio } from '@/hooks/useAudio';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,6 +28,9 @@ export default function GameCanvas() {
   const [persistentUpgrades, setPersistentUpgrades] = useState<Upgrades>({ carryCapacity: 0 });
   const [persistentFunding, setPersistentFunding] = useState<number>(0);
   const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
+
+  // Audio system
+  const { playTrack, toggleMute, isMuted } = useAudio();
 
   useEffect(() => {
     try {
@@ -54,6 +58,17 @@ export default function GameCanvas() {
       }));
     } catch { /* ignore */ }
   }, [persistentUpgrades, persistentFunding, currentLevel, isProgressLoaded]);
+
+  // Switch music based on game phase
+  useEffect(() => {
+    if (displayState.phase === 'menu') {
+      playTrack('menu');
+    } else if (displayState.phase === 'playing') {
+      playTrack('gameplay');
+    } else if (displayState.phase === 'win' || displayState.phase === 'lose') {
+      playTrack('menu'); // Return to chill music on end screens
+    }
+  }, [displayState.phase, playTrack]);
 
   const handleStart = useCallback(() => {
     resetIceTimer();
@@ -258,96 +273,116 @@ export default function GameCanvas() {
       {/* === MENU === */}
       {displayState.phase === 'menu' && (
         <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4"
-             style={{ background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)' }}>
-          <div className="card-dark p-6 w-full max-w-[420px] fade-in">
-            {/* Header */}
-            <div className="text-center mb-6">
-              <div className="inline-block px-4 py-2 rounded-full mb-3"
-                   style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
-                <span className="text-white/60 text-xs tracking-widest">SOMALI DAYCARE</span>
+             style={{ background: '#87CEEB' }}>
+          {/* Clipboard */}
+          <div className="relative w-full max-w-[420px] fade-in">
+            {/* Clipboard decorations */}
+            <div className="absolute -top-2 left-4 w-5 h-5 rounded-full" style={{ background: '#4A90D9' }} />
+            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full" style={{ background: '#4A90D9' }} />
+            <div className="absolute -top-2 right-4 w-5 h-5 rounded-full bg-white" />
+            <div className="absolute top-16 -right-1 w-3 h-12 rounded-sm rotate-12"
+                 style={{ background: 'linear-gradient(180deg, #d4a574 0%, #c4956a 50%, #ff6b6b 50%, #ff6b6b 100%)' }} />
+            <div className="absolute top-8 left-6 text-yellow-400 text-lg">★</div>
+            <div className="absolute top-32 right-8 text-gray-400 text-sm">✦</div>
+
+            {/* Clipboard board */}
+            <div className="rounded-2xl p-4 pt-6" style={{ background: '#8B6914', border: '4px solid #6B4E0A' }}>
+              {/* Header Card */}
+              <div className="rounded-xl p-4 mb-3 text-center" style={{ background: '#4A90D9' }}>
+                <h1 className="text-3xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
+                  Q-Learn™
+                </h1>
+                <p className="text-white/90 text-sm font-medium">Somali Daycare Simulator</p>
+                <p className="text-white/70 text-xs mt-1">&quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity</p>
               </div>
-              <h1 className="text-4xl font-black text-white text-shadow-lg tracking-tight">
-                Q-Learn<span className="text-[#4189DD]">™</span>
-              </h1>
-              <p className="text-white/50 text-sm mt-1 italic">&quot;Nabad iyo caano&quot; — Peace &amp; Prosperity</p>
-            </div>
 
-            {/* How to Play */}
-            <div className="glass rounded-xl p-4 mb-4">
-              <h2 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-[#4189DD] flex items-center justify-center text-xs">?</span>
-                How to Play
-              </h2>
-              <ul className="text-white/70 text-xs space-y-1.5">
-                <li className="flex items-start gap-2"><span className="text-[#4189DD]">→</span> WASD / Arrows / Touch to move</li>
-                <li className="flex items-start gap-2"><span className="text-[#22c55e]">→</span> Collect forms from classrooms</li>
-                <li className="flex items-start gap-2"><span className="text-[#f59e0b]">→</span> Drop forms at the Office desk</li>
-                <li className="flex items-start gap-2"><span className="text-[#ef4444]">→</span> HIDE in rooms when ICE patrols!</li>
-              </ul>
-            </div>
+              {/* How to Play Card */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: '#FFD93D' }}>
+                <h2 className="text-gray-800 font-bold text-sm mb-2 flex items-center gap-2">
+                  <span className="text-lg">📋</span> How to Play
+                </h2>
+                <ul className="text-gray-700 text-xs space-y-1">
+                  <li>• WASD / Arrows / Touch to move</li>
+                  <li>• Collect enrollment forms from classrooms</li>
+                  <li>• Drop forms at the Office desk</li>
+                  <li>• HIDE in rooms when ICE patrols! 🚨</li>
+                </ul>
+              </div>
 
-            {/* Current Level */}
-            <div className="rounded-xl p-4 mb-4 relative overflow-hidden"
-                 style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
-              <div className="absolute inset-0 shimmer" />
-              <div className="relative">
-                <span className="text-white/60 text-xs uppercase tracking-wider">Current Level</span>
-                <h3 className="text-white font-bold text-lg">{LEVEL_SPECS[currentLevel]?.name || 'Unknown'}</h3>
-                <div className="flex items-center gap-2 mt-2">
-                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-white/80 rounded-full" style={{ width: `${((currentLevel + 1) / LEVEL_SPECS.length) * 100}%` }} />
-                  </div>
-                  <span className="text-white/80 text-xs font-medium">{currentLevel + 1}/{LEVEL_SPECS.length}</span>
+              {/* Pink Banner */}
+              <div className="rounded-lg p-2 mb-3 text-center" style={{ background: '#FFB6C1' }}>
+                <p className="text-gray-700 text-xs font-medium">
+                  ❄️ ICE agents have NO jurisdiction over love ❄️
+                </p>
+              </div>
+
+              {/* Level Card */}
+              <div className="rounded-xl p-3 mb-3 text-center" style={{ background: '#4A90D9' }}>
+                <p className="text-white font-bold text-lg flex items-center justify-center gap-2">
+                  <span>🏫</span> {LEVEL_SPECS[currentLevel]?.name || 'Unknown'}
+                </p>
+                <p className="text-white/80 text-sm">Level {currentLevel + 1} of {LEVEL_SPECS.length}</p>
+              </div>
+
+              {/* Upgrades Card */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: '#7BC67E' }}>
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-800 font-bold text-sm flex items-center gap-1">
+                    <span>💰</span> Upgrades
+                  </span>
+                  <span className="px-3 py-1 bg-blue-500 rounded-lg text-white text-sm font-bold">
+                    ${persistentFunding}
+                  </span>
                 </div>
+                <button
+                  onClick={handleBuyCapacity}
+                  disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
+                  className={`w-full p-2 rounded-lg font-bold text-sm transition-all ${
+                    persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                      ? 'bg-emerald-400 text-gray-800 hover:bg-emerald-300 active:scale-[0.98]'
+                      : 'bg-emerald-400/50 text-gray-600 cursor-not-allowed'
+                  }`}
+                >
+                  +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
+                </button>
               </div>
-            </div>
 
-            {/* Upgrades */}
-            <div className="rounded-xl p-4 mb-4"
-                 style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-white font-bold text-sm">Upgrades</span>
-                <span className="px-3 py-1 bg-white/20 rounded-full text-white text-sm font-bold">
-                  ${persistentFunding}
-                </span>
-              </div>
+              {/* Start Button */}
               <button
-                onClick={handleBuyCapacity}
-                disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
-                className={`w-full p-3 rounded-lg font-bold text-sm transition-all ${
-                  persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
-                    ? 'bg-white text-green-700 hover:scale-[1.02] active:scale-[0.98] shadow-lg'
-                    : 'bg-white/20 text-white/50 cursor-not-allowed'
-                }`}
+                onClick={handleStart}
+                className="w-full py-4 text-white text-xl font-black rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+                style={{
+                  background: '#4A90D9',
+                  boxShadow: '0 4px 0 #3A7BC8, 0 6px 10px rgba(0,0,0,0.3)',
+                }}
               >
-                <div className="flex justify-between items-center">
-                  <span>+1 Form Capacity</span>
-                  <span>${UPGRADE_COSTS.carryCapacity}</span>
-                </div>
-                <div className="text-xs opacity-70 mt-1">
-                  {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY} slots
-                </div>
+                ▶ START SHIFT
+              </button>
+
+              {/* Footer */}
+              <p className="text-yellow-200/90 text-xs text-center mt-3 font-medium">
+                Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
+              </p>
+              <p className="text-yellow-200/60 text-xs text-center mt-1 italic">
+                &quot;They can deport people, but they can&apos;t deport community&quot;
+              </p>
+
+              {/* Music Toggle */}
+              <button
+                onClick={toggleMute}
+                className="w-full mt-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
+                style={{ background: isMuted ? 'rgba(255,255,255,0.1)' : '#4A90D9', color: isMuted ? '#9ca3af' : 'white' }}
+              >
+                {isMuted ? '🔇 Music Off' : '🎵 Music On'}
+              </button>
+
+              <button
+                onClick={handleResetProgress}
+                className="w-full mt-2 py-2 text-yellow-200/40 text-xs hover:text-yellow-200/70 transition-colors underline"
+              >
+                Reset Progress
               </button>
             </div>
-
-            {/* Start Button */}
-            <button
-              onClick={handleStart}
-              className="w-full py-4 text-white text-lg font-black rounded-xl btn-primary pulse-glow relative overflow-hidden"
-            >
-              <span className="relative z-10">▶ START SHIFT</span>
-            </button>
-
-            <p className="text-white/40 text-xs text-center mt-4">
-              Get suspicion below {LOSE_THRESHOLD}% to pass inspection
-            </p>
-
-            <button
-              onClick={handleResetProgress}
-              className="w-full mt-4 py-2 text-white/30 text-xs hover:text-white/60 transition-colors"
-            >
-              Reset Progress
-            </button>
           </div>
         </div>
       )}
@@ -386,8 +421,15 @@ export default function GameCanvas() {
                 )}
               </div>
 
-              {/* Timer & Pause */}
+              {/* Timer & Controls */}
               <div className="flex gap-2 items-center">
+                <button
+                  onClick={toggleMute}
+                  className="badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer"
+                  title={isMuted ? 'Unmute music' : 'Mute music'}
+                >
+                  {isMuted ? '🔇' : '🎵'}
+                </button>
                 <button
                   onClick={() => setIsPaused(true)}
                   className="badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer"
