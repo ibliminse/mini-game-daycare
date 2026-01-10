@@ -153,6 +153,11 @@ function spawnIceAgentForHallway(agent: IceAgent, state: GameState): void {
   agent.targetRoomId = undefined;
   agent.searchTimer = undefined;
   agent.returnPosition = undefined;
+
+  // Debug log spawn info
+  if (typeof window !== 'undefined' && (window as unknown as Record<string, boolean>).DEBUG_ICE) {
+    console.log(`ICE Agent ${agent.id} spawned: hallway=${hallway.id}, pos=(${agent.x.toFixed(0)}, ${agent.y.toFixed(0)}), dir=${agent.direction}, horizontal=${isHorizontal}`);
+  }
 }
 
 /**
@@ -165,17 +170,34 @@ function updateIceAgentPatrol(agent: IceAgent, state: GameState, dt: number): vo
     hallway = state.building.rooms.find(r => r.type === 'hallway');
     if (!hallway) {
       // No hallways at all - deactivate agent
+      console.warn(`ICE Agent ${agent.id}: No hallways found, deactivating`);
       agent.active = false;
       agent.x = -100;
       agent.y = -100;
       return;
     }
     // Update agent's assigned hallway
+    console.warn(`ICE Agent ${agent.id}: Assigned hallway '${agent.assignedHallwayId}' not found, falling back to '${hallway.id}'`);
     agent.assignedHallwayId = hallway.id;
   }
 
   const bounds = hallway.bounds;
   const isHorizontal = bounds.width > bounds.height;
+
+  // Validate that agent direction matches hallway orientation
+  const isValidDirection = isHorizontal
+    ? (agent.direction === 'left' || agent.direction === 'right')
+    : (agent.direction === 'up' || agent.direction === 'down');
+
+  if (!isValidDirection) {
+    // Fix agent direction to match hallway orientation
+    console.warn(`ICE Agent ${agent.id}: Invalid direction '${agent.direction}' for ${isHorizontal ? 'horizontal' : 'vertical'} hallway, fixing`);
+    if (isHorizontal) {
+      agent.direction = agent.x < bounds.x + bounds.width / 2 ? 'right' : 'left';
+    } else {
+      agent.direction = agent.y < bounds.y + bounds.height / 2 ? 'down' : 'up';
+    }
+  }
 
   // Move in facing direction
   const speed = agent.speed * dt;
@@ -184,6 +206,21 @@ function updateIceAgentPatrol(agent: IceAgent, state: GameState, dt: number): vo
     case 'left': agent.x -= speed; break;
     case 'down': agent.y += speed; break;
     case 'up': agent.y -= speed; break;
+  }
+
+  // Constrain agent to hallway center line (perpendicular to movement direction)
+  if (isHorizontal) {
+    // For horizontal hallways, keep Y centered
+    const centerY = bounds.y + bounds.height / 2;
+    if (Math.abs(agent.y - centerY) > 5) {
+      agent.y = centerY;
+    }
+  } else {
+    // For vertical hallways, keep X centered
+    const centerX = bounds.x + bounds.width / 2;
+    if (Math.abs(agent.x - centerX) > 5) {
+      agent.x = centerX;
+    }
   }
 
   // Check if agent has left the hallway
@@ -311,7 +348,25 @@ function updateIceAgentSearch(agent: IceAgent, state: GameState, dt: number): vo
           // Returned to hallway, resume patrol
           agent.state = 'patrolling';
           agent.targetRoomId = undefined;
+          // Snap to return position to avoid drift
+          agent.x = agent.returnPosition.x;
+          agent.y = agent.returnPosition.y;
           agent.returnPosition = undefined;
+
+          // Ensure direction is correct for the hallway
+          const hallway = getHallwayBounds(state, agent.assignedHallwayId);
+          if (hallway) {
+            const bounds = hallway.bounds;
+            const isHorizontal = bounds.width > bounds.height;
+            // Pick a random direction along the hallway
+            if (isHorizontal) {
+              agent.direction = Math.random() > 0.5 ? 'right' : 'left';
+              agent.y = bounds.y + bounds.height / 2; // Snap to center
+            } else {
+              agent.direction = Math.random() > 0.5 ? 'down' : 'up';
+              agent.x = bounds.x + bounds.width / 2; // Snap to center
+            }
+          }
         } else {
           const speed = agent.speed * dt * 0.8;
           agent.x += (dx / dist) * speed;
