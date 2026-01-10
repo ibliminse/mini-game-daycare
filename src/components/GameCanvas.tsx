@@ -272,52 +272,70 @@ export default function GameCanvas() {
   const isLose = displayState.phase === 'lose';
   const suspicionPercent = Math.min(100, (displayState.suspicion / MAX_SUSPICION) * 100);
 
+  // Detect if we're on a mobile device in portrait
+  const [isMobilePortrait, setIsMobilePortrait] = useState(false);
+
+  useEffect(() => {
+    const checkOrientation = () => {
+      setIsMobilePortrait(window.innerWidth < 768 && window.innerHeight > window.innerWidth);
+    };
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    return () => window.removeEventListener('resize', checkOrientation);
+  }, []);
+
+  // System font stack that works across all devices
+  const systemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
   return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden select-none"
-         style={{
-           backgroundColor: '#1a1a2e',
-           paddingTop: 'env(safe-area-inset-top)',
-           paddingBottom: 'env(safe-area-inset-bottom)',
-           paddingLeft: 'env(safe-area-inset-left)',
-           paddingRight: 'env(safe-area-inset-right)',
-         }}
-         role="application"
-         aria-label="Q-Learn Daycare Simulator Game">
+    <div
+      className="fixed inset-0 overflow-hidden select-none"
+      style={{
+        backgroundColor: COLORS.classroomFloor,
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+      role="application"
+      aria-label="Q-Learn Daycare Simulator Game"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Game canvas - hidden during menu, visible during play */}
       <div
-        className="relative"
-        style={{
-          width: 'min(100vw, calc(100vh * 1000 / 600))',
-          height: 'min(100vh, calc(100vw * 600 / 1000))',
-          maxWidth: '1000px',
-          maxHeight: '600px',
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        className={`absolute inset-0 flex items-center justify-center ${displayState.phase === 'menu' ? 'hidden' : ''}`}
+        style={{ backgroundColor: '#1a1a2e' }}
       >
         <canvas
           ref={canvasRef}
           width={MAP_WIDTH}
           height={MAP_HEIGHT}
-          className="absolute inset-0 w-full h-full focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-yellow-400"
-          style={{ imageRendering: 'pixelated' }}
+          className="max-w-full max-h-full focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-yellow-400"
+          style={{
+            imageRendering: 'pixelated',
+            width: isMobilePortrait ? '100%' : 'auto',
+            height: isMobilePortrait ? 'auto' : '100%',
+          }}
           aria-label="Game canvas - use arrow keys or WASD to move"
           tabIndex={0}
         />
+      </div>
 
-        {/* Menu - Somali Daycare Style */}
-        {displayState.phase === 'menu' && (
-          <div className="absolute inset-0 flex items-center justify-center overflow-auto p-2 sm:py-4"
-               style={{ backgroundColor: COLORS.classroomFloor }}
-               role="dialog"
-               aria-label="Main menu"
-               aria-modal="true">
-            {/* Bulletin board background */}
-            <div className="relative p-3 sm:p-4 rounded-lg shadow-2xl w-[95%] max-w-[380px]"
-                 style={{
-                   backgroundColor: COLORS.bulletinBoard,
-                   border: '6px solid #8b4513',
-                 }}>
+      {/* Menu - Somali Daycare Style - Fullscreen on mobile */}
+      {displayState.phase === 'menu' && (
+        <div className="absolute inset-0 flex items-center justify-center overflow-auto py-4 px-3"
+             style={{ backgroundColor: COLORS.classroomFloor }}
+             role="dialog"
+             aria-label="Main menu"
+             aria-modal="true">
+          {/* Bulletin board background - full width on mobile */}
+          <div className="relative p-4 rounded-lg shadow-2xl w-full max-w-[400px]"
+               style={{
+                 backgroundColor: COLORS.bulletinBoard,
+                 border: '6px solid #8b4513',
+               }}>
               {/* Pushpins - Somali flag colors */}
               <div className="absolute -top-2 left-8 w-4 h-4 rounded-full border-2"
                    style={{ backgroundColor: COLORS.uiBlue, borderColor: '#3070b8' }} />
@@ -332,13 +350,13 @@ export default function GameCanvas() {
                 <span className="absolute top-1 right-2 text-white/30 text-lg">★</span>
                 <span className="absolute bottom-1 left-2 text-white/30 text-sm">★</span>
                 <h1 className="text-2xl font-bold text-white"
-                    style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                    style={{ fontFamily: systemFont }}>
                   Q-Learn™
                 </h1>
-                <p className="text-sm text-white/90" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                <p className="text-sm text-white/90" style={{ fontFamily: systemFont }}>
                   Somali Daycare Simulator
                 </p>
-                <p className="text-[10px] text-white/70 mt-1" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                <p className="text-[10px] text-white/70 mt-1" style={{ fontFamily: systemFont }}>
                   &quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity
                 </p>
               </div>
@@ -350,10 +368,10 @@ export default function GameCanvas() {
               <div className="p-2 mb-2 rotate-1"
                    style={{ backgroundColor: COLORS.uiYellow }}>
                 <h2 className="font-bold mb-1 text-center text-xs"
-                    style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                    style={{ fontFamily: systemFont, color: '#333' }}>
                   📋 How to Play
                 </h2>
-                <ul className="space-y-0 text-xs leading-tight" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                <ul className="space-y-0 text-xs leading-tight" style={{ fontFamily: systemFont, color: '#333' }}>
                   <li>• WASD / Arrows / Touch to move</li>
                   <li>• Collect enrollment forms from classrooms</li>
                   <li>• Drop forms at the Office desk</li>
@@ -364,7 +382,7 @@ export default function GameCanvas() {
               {/* Anti-ICE note - looks like a sticky note */}
               <div className="p-1.5 mb-2 -rotate-2 shadow-md"
                    style={{ backgroundColor: '#ffb3b3' }}>
-                <p className="text-[10px] text-center font-bold" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#8b0000' }}>
+                <p className="text-[10px] text-center font-bold" style={{ fontFamily: systemFont, color: '#8b0000' }}>
                   ❄️ ICE agents have NO jurisdiction over love ❄️
                 </p>
               </div>
@@ -373,11 +391,11 @@ export default function GameCanvas() {
               <div className="p-2 mb-2 -rotate-1"
                    style={{ backgroundColor: COLORS.uiBlue }}>
                 <h2 className="font-bold text-center text-white"
-                    style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                    style={{ fontFamily: systemFont }}>
                   🏫 {LEVELS[currentLevel]?.name || 'Unknown'}
                 </h2>
                 <p className="text-xs text-center text-white/80"
-                   style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                   style={{ fontFamily: systemFont }}>
                   Level {currentLevel + 1} of {LEVELS.length}
                 </p>
               </div>
@@ -387,11 +405,11 @@ export default function GameCanvas() {
                    style={{ backgroundColor: COLORS.uiGreen }}>
                 <div className="flex justify-between items-center mb-1">
                   <h2 className="font-bold text-xs text-white"
-                      style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                      style={{ fontFamily: systemFont }}>
                     💰 Upgrades
                   </h2>
                   <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-bold text-white"
-                        style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                        style={{ fontFamily: systemFont }}>
                     ${persistentFunding}
                   </span>
                 </div>
@@ -404,7 +422,7 @@ export default function GameCanvas() {
                       ? 'bg-white text-green-700 hover:scale-105'
                       : 'bg-white/30 text-white/60 cursor-not-allowed'
                   }`}
-                  style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                  style={{ fontFamily: systemFont }}
                   aria-label={`Buy plus one carry capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Currently ${CARRY_CAPACITY + persistentUpgrades.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
                 >
                   +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
@@ -415,7 +433,7 @@ export default function GameCanvas() {
                 onClick={handleStart}
                 className="w-full py-3 text-white text-lg font-bold rounded transform hover:scale-105 transition-all shadow-lg"
                 style={{
-                  fontFamily: 'Comic Sans MS, cursive',
+                  fontFamily: systemFont,
                   backgroundColor: COLORS.uiBlue,
                   border: '3px solid #3070b8'
                 }}
@@ -424,12 +442,12 @@ export default function GameCanvas() {
                 ▶ START SHIFT
               </button>
 
-              <p className="mt-2 text-xs text-center" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
+              <p className="mt-2 text-xs text-center" style={{ fontFamily: systemFont, color: '#fff' }}>
                 Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
               </p>
 
               {/* Bottom tagline */}
-              <p className="mt-1 text-[9px] text-center opacity-70" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}>
+              <p className="mt-1 text-[9px] text-center opacity-70" style={{ fontFamily: systemFont, color: '#fff' }}>
                 &quot;They can deport people, but they can&apos;t deport community&quot;
               </p>
 
@@ -437,7 +455,7 @@ export default function GameCanvas() {
               <button
                 onClick={handleResetProgress}
                 className="mt-3 text-[10px] text-center opacity-50 hover:opacity-100 transition-opacity underline"
-                style={{ fontFamily: 'Comic Sans MS, cursive', color: '#fff' }}
+                style={{ fontFamily: systemFont, color: '#fff' }}
                 aria-label="Reset all game progress including upgrades, funding, and level progression"
               >
                 Reset Progress
@@ -454,27 +472,27 @@ export default function GameCanvas() {
               {/* Left side stats */}
               <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVELS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
                   {LEVELS[displayState.level]?.name || 'Unknown'}
                 </div>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}>
+                     style={{ backgroundColor: COLORS.uiGreen, fontFamily: systemFont }}>
                   ${displayState.totalFunding}
                 </div>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
                   {displayState.player.carrying}/{displayState.player.carryCapacity} forms
                 </div>
                 {/* Active power-ups */}
                 {displayState.sprintTimer > 0 && (
                   <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
-                       style={{ backgroundColor: COLORS.uiYellow, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                       style={{ backgroundColor: COLORS.uiYellow, fontFamily: systemFont, color: '#333' }}>
                     SPRINT {Math.ceil(displayState.sprintTimer)}s
                   </div>
                 )}
                 {displayState.noIceTimer > 0 && (
                   <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
-                       style={{ backgroundColor: COLORS.uiPink, fontFamily: 'Comic Sans MS, cursive' }}>
+                       style={{ backgroundColor: COLORS.uiPink, fontFamily: systemFont }}>
                     NO ICE {Math.ceil(displayState.noIceTimer)}s
                   </div>
                 )}
@@ -485,12 +503,12 @@ export default function GameCanvas() {
                 <button
                   onClick={() => setIsPaused(true)}
                   className="px-2 py-0.5 text-xs font-bold rounded hover:scale-105 transition-transform"
-                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: '#333' }}
+                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: systemFont, color: '#333' }}
                   aria-label="Pause game">
                   PAUSE
                 </button>
                 <div className="px-2 py-0.5 text-sm font-bold rounded pointer-events-none"
-                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}
+                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: systemFont, color: COLORS.uiCrayon }}
                      aria-label={`Time remaining: ${Math.ceil(displayState.timeRemaining)} seconds`}>
                   {Math.ceil(displayState.timeRemaining)}s
                 </div>
@@ -505,7 +523,7 @@ export default function GameCanvas() {
                  aria-valuemax={100}
                  aria-label={`Suspicion level: ${Math.floor(displayState.suspicion)} percent. Goal: below ${LOSE_THRESHOLD} percent`}>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
+                <span className="text-xs font-bold text-white" style={{ fontFamily: systemFont }}>
                   Suspicion
                 </span>
                 <div className="flex-1 h-4 rounded overflow-hidden border-2 relative"
@@ -532,7 +550,7 @@ export default function GameCanvas() {
                   />
                   {/* Percentage text */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-bold" style={{ fontFamily: 'Comic Sans MS, cursive', color: '#333' }}>
+                    <span className="text-xs font-bold" style={{ fontFamily: systemFont, color: '#333' }}>
                       {Math.floor(displayState.suspicion)}% (goal: ≤{LOSE_THRESHOLD}%)
                     </span>
                   </div>
@@ -553,7 +571,7 @@ export default function GameCanvas() {
                        border: `4px solid ${COLORS.uiBlue}`,
                      }}>
                   <h2 className="text-xl font-bold text-center mb-4"
-                      style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiBlue }}>
+                      style={{ fontFamily: systemFont, color: COLORS.uiBlue }}>
                     PAUSED
                   </h2>
 
@@ -562,7 +580,7 @@ export default function GameCanvas() {
                       onClick={() => setIsPaused(false)}
                       className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
                       style={{
-                        fontFamily: 'Comic Sans MS, cursive',
+                        fontFamily: systemFont,
                         backgroundColor: COLORS.uiGreen,
                         border: '2px solid #0a8a4d'
                       }}
@@ -575,7 +593,7 @@ export default function GameCanvas() {
                       onClick={() => setShowShop(true)}
                       className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
                       style={{
-                        fontFamily: 'Comic Sans MS, cursive',
+                        fontFamily: systemFont,
                         backgroundColor: COLORS.uiYellow,
                         color: '#333',
                         border: '2px solid #d4a844'
@@ -589,7 +607,7 @@ export default function GameCanvas() {
                       onClick={() => { setIsPaused(false); handleMenu(); }}
                       className="w-full py-2 font-bold rounded hover:scale-105 transition-transform"
                       style={{
-                        fontFamily: 'Comic Sans MS, cursive',
+                        fontFamily: systemFont,
                         backgroundColor: '#ddd',
                         color: '#333',
                         border: '2px solid #999'
@@ -617,11 +635,11 @@ export default function GameCanvas() {
                      }}>
                   <div className="flex justify-between items-center mb-3">
                     <h2 className="text-lg font-bold"
-                        style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiGreen }}>
+                        style={{ fontFamily: systemFont, color: COLORS.uiGreen }}>
                       SHOP
                     </h2>
                     <span className="px-2 py-1 rounded font-bold text-white"
-                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: 'Comic Sans MS, cursive' }}
+                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: systemFont }}
                           aria-label={`Available funds: ${displayState.totalFunding} dollars`}>
                       ${displayState.totalFunding}
                     </span>
@@ -637,7 +655,7 @@ export default function GameCanvas() {
                           ? 'bg-green-500 text-white hover:bg-green-600'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
-                      style={{ fontFamily: 'Comic Sans MS, cursive' }}
+                      style={{ fontFamily: systemFont }}
                       aria-label={`Buy plus one form capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Current capacity: ${displayState.player.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
                     >
                       +1 Form Capacity (${UPGRADE_COSTS.carryCapacity})
@@ -656,7 +674,7 @@ export default function GameCanvas() {
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                       style={{
-                        fontFamily: 'Comic Sans MS, cursive',
+                        fontFamily: systemFont,
                         backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? COLORS.uiYellow : undefined,
                         color: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? '#333' : undefined
                       }}
@@ -678,7 +696,7 @@ export default function GameCanvas() {
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       }`}
                       style={{
-                        fontFamily: 'Comic Sans MS, cursive',
+                        fontFamily: systemFont,
                         backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0 ? COLORS.uiPink : undefined
                       }}
                       aria-label={`Buy no ICE power-up for ${UPGRADE_COSTS.noIce} dollars. ${displayState.noIceTimer > 0 ? `Currently active: ${Math.ceil(displayState.noIceTimer)} seconds remaining` : `Gives ${NO_ICE_DURATION} seconds of ICE-free time`}`}
@@ -694,7 +712,7 @@ export default function GameCanvas() {
                     onClick={() => setShowShop(false)}
                     className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
                     style={{
-                      fontFamily: 'Comic Sans MS, cursive',
+                      fontFamily: systemFont,
                       backgroundColor: COLORS.uiBlue,
                       border: '2px solid #3070b8'
                     }}
@@ -724,14 +742,14 @@ export default function GameCanvas() {
               {/* Level name */}
               <div className="text-center mb-2">
                 <span className="px-3 py-1 text-sm font-bold text-white"
-                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
+                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
                   {LEVELS[displayState.level]?.name || 'Unknown'}
                 </span>
               </div>
 
               <h1 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-3 text-center"
                   style={{
-                    fontFamily: 'Comic Sans MS, cursive',
+                    fontFamily: systemFont,
                     color: isWin ? COLORS.uiGreen : COLORS.uiRed
                   }}>
                 {isWin
@@ -740,7 +758,7 @@ export default function GameCanvas() {
               </h1>
 
               <p className="text-sm sm:text-base mb-3 sm:mb-4 text-center"
-                 style={{ fontFamily: 'Comic Sans MS, cursive', color: COLORS.uiCrayon }}>
+                 style={{ fontFamily: systemFont, color: COLORS.uiCrayon }}>
                 {isWin
                   ? (displayState.level >= LEVELS.length - 1
                       ? 'You saved all the daycares! Quality outcomes achieved.'
@@ -751,19 +769,19 @@ export default function GameCanvas() {
               <div className="grid grid-cols-2 gap-1 sm:gap-2 mb-3 sm:mb-4" role="group" aria-label="Level statistics">
                 <div className="p-1.5 sm:p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }} aria-label={`Enrollments: ${displayState.enrollments}`}>
                   <div className="text-lg sm:text-xl font-bold text-white">{displayState.enrollments}</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Enrollments</div>
+                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Enrollments</div>
                 </div>
                 <div className="p-1.5 sm:p-2 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }} aria-label={`Total funding saved: ${displayState.totalFunding} dollars`}>
                   <div className="text-lg sm:text-xl font-bold text-gray-800">${displayState.totalFunding}</div>
-                  <div className="text-[10px] sm:text-xs text-gray-700" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Total Saved</div>
+                  <div className="text-[10px] sm:text-xs text-gray-700" style={{ fontFamily: systemFont }}>Total Saved</div>
                 </div>
                 <div className="p-1.5 sm:p-2 text-center rotate-1" style={{ backgroundColor: displayState.suspicion <= LOSE_THRESHOLD ? COLORS.uiGreen : COLORS.uiRed }} aria-label={`Suspicion: ${Math.floor(displayState.suspicion)} percent, ${displayState.suspicion <= LOSE_THRESHOLD ? 'goal met' : 'goal not met'}`}>
                   <div className="text-lg sm:text-xl font-bold text-white">{Math.floor(displayState.suspicion)}%</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
+                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
                 </div>
                 <div className="p-1.5 sm:p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }} aria-label={`Carry capacity: ${CARRY_CAPACITY + persistentUpgrades.carryCapacity}`}>
                   <div className="text-lg sm:text-xl font-bold text-white">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: 'Comic Sans MS, cursive' }}>Carry Cap</div>
+                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Carry Cap</div>
                 </div>
               </div>
 
@@ -773,7 +791,7 @@ export default function GameCanvas() {
                   onClick={handleRestart}
                   className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
                   style={{
-                    fontFamily: 'Comic Sans MS, cursive',
+                    fontFamily: systemFont,
                     backgroundColor: isWin ? COLORS.uiGreen : COLORS.uiRed,
                     border: `3px solid ${isWin ? '#0a8a4d' : '#cc5555'}`
                   }}
@@ -786,7 +804,7 @@ export default function GameCanvas() {
                     onClick={handleNextLevel}
                     className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
                     style={{
-                      fontFamily: 'Comic Sans MS, cursive',
+                      fontFamily: systemFont,
                       backgroundColor: COLORS.uiBlue,
                       border: '3px solid #3070b8'
                     }}
@@ -801,7 +819,7 @@ export default function GameCanvas() {
                 onClick={handleMenu}
                 className="w-full py-2 text-gray-800 text-sm font-bold rounded transform hover:scale-105 transition-all"
                 style={{
-                  fontFamily: 'Comic Sans MS, cursive',
+                  fontFamily: systemFont,
                   backgroundColor: '#ddd',
                   border: '2px solid #999'
                 }}
@@ -812,7 +830,6 @@ export default function GameCanvas() {
             </div>
           </div>
         )}
-      </div>
     </div>
   );
 }
