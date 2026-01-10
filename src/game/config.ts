@@ -32,14 +32,14 @@ export const WARNING_THRESHOLD = 50; // warning when above this
 
 // Upgrades
 export const UPGRADE_COSTS = {
-  carryCapacity: 10, // cost per extra slot
-  sprint: 15, // speed boost
-  noIce: 25, // no ICE spawns
+  carryCapacity: 30, // cost per extra slot (form)
+  sprint: 20, // speed boost
+  noIce: 50, // no ICE spawns
 };
 export const MAX_CARRY_CAPACITY = 10;
-export const SPRINT_DURATION = 5; // seconds
+export const SPRINT_DURATION = 11; // seconds
 export const SPRINT_SPEED_MULTIPLIER = 1.5;
-export const NO_ICE_DURATION = 10; // seconds
+export const NO_ICE_DURATION = 15; // seconds
 
 // Timer
 export const INSPECTION_TIME = 45; // 45 seconds per level

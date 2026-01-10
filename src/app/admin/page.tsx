@@ -272,7 +272,7 @@ export default function AdminPage() {
     for (const classroom of classrooms) {
       const connection = findAdjacentHallway(classroom.x, classroom.y, classroom.width, classroom.height);
       if (connection) {
-        const doorWidth = 60;
+        const doorWidth = 45;
         const { hallway: h, side } = connection;
         if (side === 'above') {
           doors.push({ x: classroom.x + classroom.width / 2 - doorWidth / 2, y: classroom.y + classroom.height - 20, width: doorWidth, height: 40, connects: [classroom.id, h.id] });
@@ -290,7 +290,7 @@ export default function AdminPage() {
     if (office) {
       const connection = findAdjacentHallway(office.x, office.y, office.width, office.height);
       if (connection) {
-        const doorWidth = 60;
+        const doorWidth = 45;
         const { hallway: h, side } = connection;
         if (side === 'above') {
           doors.push({ x: office.x + office.width / 2 - doorWidth / 2, y: office.y + office.height - 20, width: doorWidth, height: 40, connects: [office.id, h.id] });

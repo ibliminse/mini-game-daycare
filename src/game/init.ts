@@ -86,7 +86,7 @@ export function createBuildingFromSpec(spec: LevelSpec): Building {
     hallway: typeof spec.hallways[0],
     side: 'above' | 'below' | 'left' | 'right'
   ): Door => {
-    const doorWidth = 60;
+    const doorWidth = 45;
 
     if (side === 'above') {
       return {
