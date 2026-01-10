@@ -113,9 +113,9 @@ export function createBuildingFromSpec(spec: LevelSpec): Building {
         connects: [room.id, hallway.id],
       };
     } else {
-      // right
+      // right - room is to the right of hallway
       return {
-        x: hallway.x + hallway.width - 20,
+        x: room.x - 20,
         y: room.y + room.height / 2 - doorWidth / 2,
         width: 40,
         height: doorWidth,

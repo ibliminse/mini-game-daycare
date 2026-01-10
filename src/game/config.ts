@@ -23,8 +23,8 @@ export const ENROLLMENT_PER_FORM = 1;
 export const SUSPICION_REDUCTION_PER_FORM = 8; // how much suspicion decreases per form
 export const CAPACITY_BONUS_REDUCTION = 3; // extra reduction for full stack
 
-// Suspicion (starts at 50, need to get to 30 or below to win)
-export const INITIAL_SUSPICION = 50;
+// Suspicion (starts at 100, need to get to 30 or below to win)
+export const INITIAL_SUSPICION = 100;
 export const LOSE_THRESHOLD = 30; // if above this at end, you lose
 export const PASSIVE_SUSPICION_RATE = 0.8; // suspicion creeps up per second (faster)
 export const MAX_SUSPICION = 100;

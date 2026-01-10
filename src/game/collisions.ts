@@ -66,12 +66,14 @@ export function isPositionWalkable(
 
   // Check if player is in a door zone (expanded area for passage)
   for (const door of building.doors) {
-    // Door zones are more permissive
+    // Door zones need to be significantly expanded to bridge room-hallway gaps
+    // The gap between room/hallway inner bounds and door can be 20-30px on each side
+    const expansion = 30;
     const doorBounds = {
-      x: door.x + radius,
-      y: door.y,
-      width: door.width - radius * 2,
-      height: door.height,
+      x: door.x - expansion,
+      y: door.y - expansion,
+      width: door.width + expansion * 2,
+      height: door.height + expansion * 2,
     };
 
     if (pointInRect(x, y, doorBounds)) {
