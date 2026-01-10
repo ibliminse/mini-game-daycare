@@ -286,7 +286,7 @@ export default function GameCanvas() {
             <div className="absolute top-32 right-8 text-gray-400 text-sm">✦</div>
 
             {/* Clipboard board */}
-            <div className="rounded-2xl p-4 pt-6" style={{ background: '#8B6914', border: '4px solid #6B4E0A' }}>
+            <div className="rounded-2xl p-4 pt-6" style={{ background: '#8B5A2B', border: '4px solid #6B4423' }}>
               {/* Header Card */}
               <div className="rounded-xl p-4 mb-3 text-center" style={{ background: '#4A90D9' }}>
                 <h1 className="text-3xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
