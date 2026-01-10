@@ -244,7 +244,7 @@ function drawDoors(ctx: CanvasRenderingContext2D, state: GameState): void {
  * Draw room labels (room names)
  */
 function drawRoomLabels(ctx: CanvasRenderingContext2D, state: GameState): void {
-  ctx.font = 'bold 12px Comic Sans MS, cursive';
+  ctx.font = 'bold 12px Arial, sans-serif';
   ctx.textAlign = 'center';
 
   for (const room of state.building.rooms) {
@@ -394,7 +394,7 @@ function drawDesk(ctx: CanvasRenderingContext2D, state: GameState, time: number)
 
   // Label
   ctx.fillStyle = COLORS.uiCrayon;
-  ctx.font = 'bold 11px Comic Sans MS, cursive';
+  ctx.font = 'bold 11px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('DROP OFF', desk.x + desk.width / 2, desk.y + desk.height - 10);
 }
@@ -585,7 +585,7 @@ function drawWarningBanner(ctx: CanvasRenderingContext2D, time: number): void {
   ctx.stroke();
 
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px Comic Sans MS, cursive';
+  ctx.font = 'bold 18px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('!! SUSPICION HIGH !!', MAP_WIDTH / 2, 33);
 }
@@ -738,7 +738,7 @@ function drawIceWarning(ctx: CanvasRenderingContext2D, time: number): void {
   // Warning text
   ctx.save();
   ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-  ctx.font = 'bold 14px Comic Sans MS, cursive';
+  ctx.font = 'bold 14px Arial, sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText('⚠ ICE PATROL - HIDE IN ROOMS!', 10, 580);
   ctx.restore();
@@ -762,11 +762,11 @@ function drawIceCountdown(ctx: CanvasRenderingContext2D, countdown: number, time
   // Warning text
   ctx.save();
   ctx.fillStyle = `rgba(200, 50, 0, ${flashAlpha})`;
-  ctx.font = 'bold 28px Comic Sans MS, cursive';
+  ctx.font = 'bold 28px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText(`⚠ ICE INCOMING IN ${Math.ceil(countdown)}! ⚠`, MAP_WIDTH / 2, MAP_HEIGHT - 25);
 
-  ctx.font = 'bold 14px Comic Sans MS, cursive';
+  ctx.font = 'bold 14px Arial, sans-serif';
   ctx.fillText('GET TO A ROOM NOW!', MAP_WIDTH / 2, MAP_HEIGHT - 8);
   ctx.restore();
 }
