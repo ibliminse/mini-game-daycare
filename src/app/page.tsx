@@ -13,6 +13,15 @@ const GameCanvas = dynamic(() => import('@/components/GameCanvas'), {
   ),
 });
 
+const InstallPrompt = dynamic(() => import('@/components/InstallPrompt'), {
+  ssr: false,
+});
+
 export default function Home() {
-  return <GameCanvas />;
+  return (
+    <>
+      <GameCanvas />
+      <InstallPrompt />
+    </>
+  );
 }
