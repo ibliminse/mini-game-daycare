@@ -194,7 +194,7 @@ export const LEVEL_SPECS: LevelSpec[] = [
     isCustom: false,
     hallways: [
       { id: 'hallway-1', x: 50, y: 50, width: 80, height: 500 },
-      { id: 'hallway-2', x: 50, y: 50, width: 700, height: 80 },
+      { id: 'hallway-2', x: 50, y: 50, width: 900, height: 80 },  // Extended to reach office
       { id: 'hallway-3', x: 50, y: 260, width: 500, height: 80 },
       { id: 'hallway-4', x: 50, y: 470, width: 700, height: 80 },
     ],
@@ -205,7 +205,7 @@ export const LEVEL_SPECS: LevelSpec[] = [
       { id: 'room-d', name: 'Room D', x: 140, y: 350, width: 160, height: 110 },
       { id: 'room-e', name: 'Room E', x: 320, y: 350, width: 160, height: 110 },
     ],
-    office: { id: 'office', name: 'Office', x: 760, y: 50, width: 180, height: 200 },
+    office: { id: 'office', name: 'Office', x: 800, y: 140, width: 150, height: 150 },  // Moved below hallway
     iceConfig: { agentCount: 3, roomSearchProbability: 0.25, searchDuration: 4 },
   },
 
