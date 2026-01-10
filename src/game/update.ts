@@ -98,7 +98,37 @@ function canIceSeePlayer(ice: IceAgent, playerX: number, playerY: number): boole
  */
 function spawnIceAgentForHallway(agent: IceAgent, state: GameState): void {
   const hallway = getHallwayBounds(state, agent.assignedHallwayId);
-  if (!hallway) return;
+  if (!hallway) {
+    // Fallback: try to find ANY hallway if the assigned one isn't found
+    const anyHallway = state.building.rooms.find(r => r.type === 'hallway');
+    if (!anyHallway) {
+      console.warn(`ICE agent ${agent.id}: No hallways found in building`);
+      return;
+    }
+    // Use fallback hallway
+    const bounds = anyHallway.bounds;
+    const isHorizontal = bounds.width > bounds.height;
+    if (isHorizontal) {
+      const fromLeft = Math.random() > 0.5;
+      agent.x = fromLeft ? bounds.x - 20 : bounds.x + bounds.width + 20;
+      agent.y = bounds.y + bounds.height / 2;
+      agent.direction = fromLeft ? 'right' : 'left';
+    } else {
+      const fromTop = Math.random() > 0.5;
+      agent.x = bounds.x + bounds.width / 2;
+      agent.y = fromTop ? bounds.y - 20 : bounds.y + bounds.height + 20;
+      agent.direction = fromTop ? 'down' : 'up';
+    }
+    agent.active = true;
+    agent.timer = ICE_AGENT.duration;
+    agent.state = 'patrolling';
+    agent.targetRoomId = undefined;
+    agent.searchTimer = undefined;
+    agent.returnPosition = undefined;
+    // Update the agent's assigned hallway to the fallback
+    agent.assignedHallwayId = anyHallway.id;
+    return;
+  }
 
   const bounds = hallway.bounds;
   const isHorizontal = bounds.width > bounds.height;
@@ -129,8 +159,20 @@ function spawnIceAgentForHallway(agent: IceAgent, state: GameState): void {
  * Update a single ICE agent's patrol movement
  */
 function updateIceAgentPatrol(agent: IceAgent, state: GameState, dt: number): void {
-  const hallway = getHallwayBounds(state, agent.assignedHallwayId);
-  if (!hallway) return;
+  let hallway = getHallwayBounds(state, agent.assignedHallwayId);
+  if (!hallway) {
+    // Fallback: try to find any hallway
+    hallway = state.building.rooms.find(r => r.type === 'hallway');
+    if (!hallway) {
+      // No hallways at all - deactivate agent
+      agent.active = false;
+      agent.x = -100;
+      agent.y = -100;
+      return;
+    }
+    // Update agent's assigned hallway
+    agent.assignedHallwayId = hallway.id;
+  }
 
   const bounds = hallway.bounds;
   const isHorizontal = bounds.width > bounds.height;

@@ -461,7 +461,7 @@ export default function AdminPage() {
     if (!editableLevel) return;
 
     const existingOfType = editableLevel.rooms.filter(r => r.type === type);
-    const newId = type === 'hallway' ? `hallway${existingOfType.length + 1}` : `room-${String.fromCharCode(65 + existingOfType.length)}`;
+    const newId = type === 'hallway' ? `hallway-${existingOfType.length + 1}` : `room-${String.fromCharCode(65 + existingOfType.length).toLowerCase()}`;
     const newName = type === 'hallway' ? `Hallway ${existingOfType.length + 1}` : `Room ${String.fromCharCode(65 + existingOfType.length)}`;
 
     setEditableLevel(prev => {
@@ -563,8 +563,9 @@ export default function AdminPage() {
 
       // Create ICE agents based on the number of hallways
       const hallways = fittedLevel.rooms.filter(r => r.type === 'hallway');
-      const levelSpec = LEVEL_SPECS[selectedLevel];
-      const agentCount = Math.min(levelSpec?.iceConfig?.agentCount || 1, hallways.length);
+      // Use editable level's ICE config, with fallbacks
+      const iceConfig = fittedLevel.iceConfig || editableLevel.iceConfig || { agentCount: 1, roomSearchProbability: 0, searchDuration: 3 };
+      const agentCount = Math.min(iceConfig.agentCount || 1, hallways.length);
 
       const iceAgents = [];
       const iceWarnings = [];
@@ -610,8 +611,8 @@ export default function AdminPage() {
         hallwaySpawnTimers,
         iceConfig: {
           agentCount,
-          roomSearchProbability: levelSpec?.iceConfig?.roomSearchProbability || 0,
-          searchDuration: levelSpec?.iceConfig?.searchDuration || 3,
+          roomSearchProbability: iceConfig.roomSearchProbability || 0,
+          searchDuration: iceConfig.searchDuration || 3,
         },
         enrollments: 0,
         funding: 0,
