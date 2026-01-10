@@ -276,15 +276,23 @@ export default function GameCanvas() {
              style={{ background: '#B8D4E8' }}>
           {/* Clipboard */}
           <div className="relative w-full max-w-[420px] fade-in">
-            {/* Clipboard decorations - pins */}
-            <div className="absolute -top-2 left-6 w-6 h-6 rounded-full z-10" style={{ background: '#4A90D9' }} />
-            <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full z-10" style={{ background: '#4A90D9' }} />
-            <div className="absolute -top-2 right-6 w-6 h-6 rounded-full bg-white z-10" />
-            {/* Pencil */}
-            <div className="absolute top-20 -right-2 w-3 h-16 rounded-sm rotate-12 z-10"
-                 style={{ background: 'linear-gradient(180deg, #d4a574 0%, #c9a06a 60%, #e74c3c 60%, #c0392b 100%)' }} />
+            {/* Blackboard clips - circles that clip over the edge */}
+            <div className="absolute -top-3 left-8 w-8 h-8 rounded-full z-10" style={{ background: '#5BA3E0', boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.3)' }} />
+            <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full z-10" style={{ background: '#5BA3E0', boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.3)' }} />
+            <div className="absolute -top-3 right-8 w-8 h-8 rounded-full bg-white z-10" style={{ boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.1), inset 2px 2px 4px rgba(255,255,255,0.5)' }} />
+            {/* Crayon */}
+            <div className="absolute top-24 -right-1 z-10 rotate-[30deg]" style={{ transformOrigin: 'center' }}>
+              {/* Crayon body */}
+              <div className="w-4 h-14 rounded-sm" style={{ background: 'linear-gradient(90deg, #d4a574 0%, #e8c9a0 30%, #d4a574 70%, #b8956a 100%)' }} />
+              {/* Crayon tip */}
+              <div className="w-4 h-4 mx-auto" style={{
+                background: '#e74c3c',
+                clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)',
+                boxShadow: 'inset -1px 0 2px rgba(0,0,0,0.3)'
+              }} />
+            </div>
             {/* Star decoration */}
-            <div className="absolute top-12 right-10 text-blue-300/40 text-xs">✦</div>
+            <div className="absolute top-16 right-12 text-blue-300/30 text-sm">✦</div>
 
             {/* Clipboard board */}
             <div className="rounded-2xl p-4 pt-6" style={{ background: '#A0522D', border: '5px solid #8B4513' }}>
