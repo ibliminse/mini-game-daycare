@@ -227,15 +227,65 @@ export default function GameCanvas() {
   const suspicionPercent = Math.min(100, (displayState.suspicion / MAX_SUSPICION) * 100);
 
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
+  const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 
   useEffect(() => {
     const checkOrientation = () => {
+      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isLandscape = window.innerWidth > window.innerHeight;
       setIsMobilePortrait(window.innerWidth < 768 && window.innerHeight > window.innerWidth);
+      setIsMobileLandscape(isMobile && isLandscape && window.innerHeight < 500);
     };
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
-    return () => window.removeEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
   }, []);
+
+  // Virtual joystick state for mobile
+  const joystickRef = useRef<HTMLDivElement>(null);
+  const [joystickActive, setJoystickActive] = useState(false);
+  const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
+
+  const handleVirtualJoystickStart = useCallback((e: React.TouchEvent) => {
+    if (!joystickRef.current) return;
+    e.stopPropagation();
+    setJoystickActive(true);
+    const touch = e.touches[0];
+    const rect = joystickRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = (touch.clientX - centerX) / (rect.width / 2);
+    const dy = (touch.clientY - centerY) / (rect.height / 2);
+    const clampedX = Math.max(-1, Math.min(1, dx));
+    const clampedY = Math.max(-1, Math.min(1, dy));
+    setJoystickPos({ x: clampedX * 25, y: clampedY * 25 });
+    handleJoystickMove(clampedX, clampedY);
+  }, [handleJoystickMove]);
+
+  const handleVirtualJoystickMove = useCallback((e: React.TouchEvent) => {
+    if (!joystickActive || !joystickRef.current) return;
+    e.stopPropagation();
+    const touch = e.touches[0];
+    const rect = joystickRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = (touch.clientX - centerX) / (rect.width / 2);
+    const dy = (touch.clientY - centerY) / (rect.height / 2);
+    const clampedX = Math.max(-1, Math.min(1, dx));
+    const clampedY = Math.max(-1, Math.min(1, dy));
+    setJoystickPos({ x: clampedX * 25, y: clampedY * 25 });
+    handleJoystickMove(clampedX, clampedY);
+  }, [joystickActive, handleJoystickMove]);
+
+  const handleVirtualJoystickEnd = useCallback(() => {
+    setJoystickActive(false);
+    setJoystickPos({ x: 0, y: 0 });
+    handleJoystickEnd();
+  }, [handleJoystickEnd]);
 
   return (
     <div
@@ -485,6 +535,50 @@ export default function GameCanvas() {
               </div>
             </div>
           </div>
+
+          {/* Mobile Landscape Virtual Joystick */}
+          {isMobileLandscape && !isPaused && (
+            <>
+              {/* Left Joystick */}
+              <div
+                ref={joystickRef}
+                className="absolute left-4 bottom-4 w-24 h-24 rounded-full flex items-center justify-center"
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  backdropFilter: 'blur(4px)',
+                }}
+                onTouchStart={handleVirtualJoystickStart}
+                onTouchMove={handleVirtualJoystickMove}
+                onTouchEnd={handleVirtualJoystickEnd}
+              >
+                {/* Inner stick */}
+                <div
+                  className="w-10 h-10 rounded-full transition-transform"
+                  style={{
+                    background: 'rgba(255,255,255,0.5)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                    transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)`,
+                  }}
+                />
+              </div>
+
+              {/* Right side action buttons (optional sprint/pause) */}
+              <div className="absolute right-4 bottom-4 flex flex-col gap-2">
+                <button
+                  onClick={() => setIsPaused(true)}
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-xl"
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '3px solid rgba(255,255,255,0.3)',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  ⏸️
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Pause Menu */}
           {isPaused && !showShop && (
