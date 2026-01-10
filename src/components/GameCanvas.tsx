@@ -468,7 +468,13 @@ export default function GameCanvas() {
         {displayState.phase === 'playing' && (
           <>
             {/* Top bar - Level name and stats */}
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-1" role="status" aria-live="polite">
+            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-2 pt-3"
+                 style={{
+                   paddingTop: 'max(12px, calc(env(safe-area-inset-top) + 4px))',
+                   paddingLeft: 'max(8px, env(safe-area-inset-left))',
+                   paddingRight: 'max(8px, env(safe-area-inset-right))',
+                 }}
+                 role="status" aria-live="polite">
               {/* Left side stats */}
               <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVEL_SPECS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
                 <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
@@ -516,7 +522,12 @@ export default function GameCanvas() {
             </div>
 
             {/* Suspicion meter - horizontal bar at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 p-1 pointer-events-none"
+            <div className="absolute bottom-0 left-0 right-0 p-2 pb-3 pointer-events-none"
+                 style={{
+                   paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) + 8px))',
+                   paddingLeft: 'max(8px, env(safe-area-inset-left))',
+                   paddingRight: 'max(8px, env(safe-area-inset-right))',
+                 }}
                  role="progressbar"
                  aria-valuenow={Math.floor(displayState.suspicion)}
                  aria-valuemin={0}
