@@ -38,7 +38,7 @@ const generateSplashSVG = (width, height) => {
         font-size="${logoSize * 0.18}"
         font-weight="600"
         fill="white"
-        text-anchor="middle">Q-LEARN</text>
+        text-anchor="middle">LEARING</text>
 
   <!-- Tagline -->
   <text x="${centerX}" y="${centerY + logoSize * 0.95}"

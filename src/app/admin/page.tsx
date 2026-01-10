@@ -987,7 +987,7 @@ export default function AdminPage() {
       {/* Header */}
       <header className="p-2 sm:p-4 flex justify-between items-center" style={{ backgroundColor: COLORS.uiBlue }}>
         <h1 className="text-base sm:text-xl font-bold text-white" style={{ fontFamily: 'Comic Sans MS, cursive' }}>
-          Q-Learn™ Admin
+          Learing™ Admin
         </h1>
         <button
           onClick={handleLogout}

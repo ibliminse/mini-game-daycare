@@ -7,13 +7,13 @@ import "./globals.css";
 const GA_ID = "G-WEM89J5SDR";
 
 export const metadata: Metadata = {
-  title: "Q-Learn - Preschool Chaos",
+  title: "Learing - Preschool Chaos",
   description: "Navigate the chaos of daycare enrollment management. Collect forms, avoid ICE agents, save the daycare!",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Q-Learn",
+    title: "Learing",
     startupImage: [
       {
         url: "/splash/splash-1170x2532.png",
@@ -31,14 +31,14 @@ export const metadata: Metadata = {
     ],
   },
   openGraph: {
-    title: "Q-Learn - Preschool Chaos",
+    title: "Learing - Preschool Chaos",
     description: "Navigate the chaos of daycare enrollment management",
     type: "website",
-    siteName: "Q-Learn",
+    siteName: "Learing",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Q-Learn - Preschool Chaos",
+    title: "Learing - Preschool Chaos",
     description: "Navigate the chaos of daycare enrollment management",
   },
 };
@@ -61,11 +61,11 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* PWA Meta Tags */}
-        <meta name="application-name" content="Q-Learn" />
+        <meta name="application-name" content="Learing" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Q-Learn" />
+        <meta name="apple-mobile-web-app-title" content="Learing" />
         <meta name="format-detection" content="telephone=no" />
         <meta name="msapplication-TileColor" content="#1a1a2e" />
         <meta name="msapplication-tap-highlight" content="no" />

@@ -44,7 +44,7 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1a1a2e' }} role="main" aria-label="Admin login page">
       <div className="p-8 rounded-lg shadow-2xl" style={{ backgroundColor: COLORS.uiPaper, width: '320px' }}>
         <h1 className="text-2xl font-bold text-center mb-6" style={{ color: COLORS.uiBlue, fontFamily: 'Comic Sans MS, cursive' }}>
-          Q-Learn&trade; Admin
+          Learing&trade; Admin
         </h1>
 
         <form onSubmit={handleLogin} className="space-y-4" aria-label="Admin login form">

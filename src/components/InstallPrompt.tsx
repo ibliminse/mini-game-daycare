@@ -120,7 +120,7 @@ export default function InstallPrompt() {
             fontSize: '15px',
             marginBottom: '4px',
           }}>
-            Install Q-Learn
+            Install Learing
           </div>
           <div style={{
             color: 'rgba(255,255,255,0.7)',

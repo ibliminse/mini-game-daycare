@@ -291,7 +291,7 @@ export default function GameCanvas() {
                 <div className="absolute top-2 left-3 text-yellow-300 text-sm">★</div>
                 <div className="absolute top-2 right-3 text-blue-200/40 text-xs">✦</div>
                 <h1 className="text-3xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
-                  Q-Learn™
+                  Learing™
                 </h1>
                 <p className="text-white/90 text-sm font-medium">Somali Daycare Simulator</p>
                 <p className="text-white/70 text-xs mt-1">&quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity</p>

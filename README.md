@@ -1,4 +1,4 @@
-# Q-Learn™
+# Learing™
 
 > Hyper-casual enrollment management simulation
 
