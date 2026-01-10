@@ -273,7 +273,7 @@ export default function GameCanvas() {
       {/* === MENU === */}
       {displayState.phase === 'menu' && (
         <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4"
-             style={{ background: '#87CEEB' }}>
+             style={{ background: '#B8D4E8' }}>
           {/* Clipboard */}
           <div className="relative w-full max-w-[420px] fade-in">
             {/* Clipboard decorations */}
@@ -282,13 +282,14 @@ export default function GameCanvas() {
             <div className="absolute -top-2 right-4 w-5 h-5 rounded-full bg-white" />
             <div className="absolute top-16 -right-1 w-3 h-12 rounded-sm rotate-12"
                  style={{ background: 'linear-gradient(180deg, #d4a574 0%, #c4956a 50%, #ff6b6b 50%, #ff6b6b 100%)' }} />
-            <div className="absolute top-8 left-6 text-yellow-400 text-lg">★</div>
-            <div className="absolute top-32 right-8 text-gray-400 text-sm">✦</div>
+            <div className="absolute top-8 right-8 text-blue-300/50 text-sm">✦</div>
 
             {/* Clipboard board */}
-            <div className="rounded-2xl p-4 pt-6" style={{ background: '#8B5A2B', border: '4px solid #6B4423' }}>
+            <div className="rounded-2xl p-4 pt-6" style={{ background: '#B87333', border: '4px solid #8B4513' }}>
               {/* Header Card */}
-              <div className="rounded-xl p-4 mb-3 text-center" style={{ background: '#4A90D9' }}>
+              <div className="rounded-xl p-4 mb-3 text-center relative" style={{ background: '#4A90D9' }}>
+                <div className="absolute top-2 left-3 text-yellow-300 text-sm">★</div>
+                <div className="absolute top-2 right-3 text-blue-200/40 text-xs">✦</div>
                 <h1 className="text-3xl font-black text-white" style={{ textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
                   Q-Learn™
                 </h1>
@@ -298,10 +299,10 @@ export default function GameCanvas() {
 
               {/* How to Play Card */}
               <div className="rounded-xl p-3 mb-3" style={{ background: '#FFD93D' }}>
-                <h2 className="text-gray-800 font-bold text-sm mb-2 flex items-center gap-2">
+                <h2 className="text-gray-800 font-bold text-sm mb-2 flex items-center justify-center gap-2">
                   <span className="text-lg">📋</span> How to Play
                 </h2>
-                <ul className="text-gray-700 text-xs space-y-1">
+                <ul className="text-gray-700 text-sm space-y-1">
                   <li>• WASD / Arrows / Touch to move</li>
                   <li>• Collect enrollment forms from classrooms</li>
                   <li>• Drop forms at the Office desk</li>
@@ -311,7 +312,7 @@ export default function GameCanvas() {
 
               {/* Pink Banner */}
               <div className="rounded-lg p-2 mb-3 text-center" style={{ background: '#FFB6C1' }}>
-                <p className="text-gray-700 text-xs font-medium">
+                <p className="text-red-600 text-sm font-medium">
                   ❄️ ICE agents have NO jurisdiction over love ❄️
                 </p>
               </div>
@@ -325,7 +326,7 @@ export default function GameCanvas() {
               </div>
 
               {/* Upgrades Card */}
-              <div className="rounded-xl p-3 mb-3" style={{ background: '#7BC67E' }}>
+              <div className="rounded-xl p-3 mb-3" style={{ background: '#5BC67E' }}>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-gray-800 font-bold text-sm flex items-center gap-1">
                     <span>💰</span> Upgrades
@@ -339,31 +340,30 @@ export default function GameCanvas() {
                   disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
                   className={`w-full p-2 rounded-lg font-bold text-sm transition-all ${
                     persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
-                      ? 'bg-emerald-400 text-gray-800 hover:bg-emerald-300 active:scale-[0.98]'
-                      : 'bg-emerald-400/50 text-gray-600 cursor-not-allowed'
+                      ? 'bg-emerald-300 text-emerald-700 hover:bg-emerald-200 active:scale-[0.98]'
+                      : 'bg-emerald-300/50 text-emerald-600/50 cursor-not-allowed'
                   }`}
                 >
                   +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
                 </button>
               </div>
 
-              {/* Start Button */}
-              <button
-                onClick={handleStart}
-                className="w-full py-4 text-white text-xl font-black rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{
-                  background: '#4A90D9',
-                  boxShadow: '0 4px 0 #3A7BC8, 0 6px 10px rgba(0,0,0,0.3)',
-                }}
-              >
-                ▶ START SHIFT
-              </button>
+              {/* Start Button - with border frame */}
+              <div className="rounded-xl p-1" style={{ background: '#4A90D9' }}>
+                <button
+                  onClick={handleStart}
+                  className="w-full py-4 text-white text-xl font-black rounded-lg transition-all hover:scale-[1.02] active:scale-[0.98]"
+                  style={{ background: '#5B9FE8' }}
+                >
+                  ▶ START SHIFT
+                </button>
+              </div>
 
               {/* Footer */}
-              <p className="text-yellow-200/90 text-xs text-center mt-3 font-medium">
+              <p className="text-white text-sm text-center mt-3 font-bold">
                 Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
               </p>
-              <p className="text-yellow-200/60 text-xs text-center mt-1 italic">
+              <p className="text-white/70 text-xs text-center mt-1 italic">
                 &quot;They can deport people, but they can&apos;t deport community&quot;
               </p>
 
@@ -371,14 +371,14 @@ export default function GameCanvas() {
               <button
                 onClick={toggleMute}
                 className="w-full mt-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
-                style={{ background: isMuted ? 'rgba(255,255,255,0.1)' : '#4A90D9', color: isMuted ? '#9ca3af' : 'white' }}
+                style={{ background: isMuted ? 'rgba(255,255,255,0.2)' : '#4A90D9', color: 'white' }}
               >
                 {isMuted ? '🔇 Music Off' : '🎵 Music On'}
               </button>
 
               <button
                 onClick={handleResetProgress}
-                className="w-full mt-2 py-2 text-yellow-200/40 text-xs hover:text-yellow-200/70 transition-colors underline"
+                className="w-full mt-2 py-2 text-white/50 text-xs hover:text-white/80 transition-colors underline"
               >
                 Reset Progress
               </button>
