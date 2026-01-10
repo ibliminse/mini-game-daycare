@@ -20,16 +20,14 @@ export default function GameCanvas() {
   const gameTimeRef = useRef<number>(0);
 
   const [displayState, setDisplayState] = useState<GameState>(gameStateRef.current);
-  const [currentLevel, setCurrentLevel] = useState<number>(0); // Player's progression level
+  const [currentLevel, setCurrentLevel] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const [showShop, setShowShop] = useState<boolean>(false);
 
-  // Persistent state across games
   const [persistentUpgrades, setPersistentUpgrades] = useState<Upgrades>({ carryCapacity: 0 });
   const [persistentFunding, setPersistentFunding] = useState<number>(0);
   const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
 
-  // Load progress from localStorage on mount
   useEffect(() => {
     try {
       const savedProgress = localStorage.getItem('qlearn_progress');
@@ -37,33 +35,26 @@ export default function GameCanvas() {
         const progress = JSON.parse(savedProgress);
         if (progress.upgrades) setPersistentUpgrades(progress.upgrades);
         if (progress.funding !== undefined) setPersistentFunding(progress.funding);
-        // Validate saved level is within bounds (important when level count changes)
         if (progress.level !== undefined) {
           const validLevel = Math.max(0, Math.min(progress.level, LEVEL_SPECS.length - 1));
           setCurrentLevel(validLevel);
         }
       }
-    } catch {
-      // If parsing fails, use defaults
-    }
+    } catch { /* ignore */ }
     setIsProgressLoaded(true);
   }, []);
 
-  // Save progress to localStorage when it changes
   useEffect(() => {
-    if (!isProgressLoaded) return; // Don't save until we've loaded
+    if (!isProgressLoaded) return;
     try {
       localStorage.setItem('qlearn_progress', JSON.stringify({
         upgrades: persistentUpgrades,
         funding: persistentFunding,
         level: currentLevel,
       }));
-    } catch {
-      // If saving fails, ignore
-    }
+    } catch { /* ignore */ }
   }, [persistentUpgrades, persistentFunding, currentLevel, isProgressLoaded]);
 
-  // Start game at current progression level
   const handleStart = useCallback(() => {
     resetIceTimer();
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding);
@@ -71,39 +62,32 @@ export default function GameCanvas() {
     setDisplayState({ ...gameStateRef.current });
   }, [currentLevel, persistentUpgrades, persistentFunding]);
 
-  // Restart current level
   const handleRestart = useCallback(() => {
     resetIceTimer();
     const currentLevel = gameStateRef.current.level;
-    // Save accumulated funding before restart
     setPersistentFunding(gameStateRef.current.totalFunding);
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
     gameStateRef.current.phase = 'playing';
     setDisplayState({ ...gameStateRef.current });
   }, [persistentUpgrades]);
 
-  // Advance to next level
   const handleNextLevel = useCallback(() => {
     const nextLevel = Math.min(gameStateRef.current.level + 1, LEVEL_SPECS.length - 1);
-    setCurrentLevel(nextLevel); // Update progression
+    setCurrentLevel(nextLevel);
     resetIceTimer();
-    // Save accumulated funding
     setPersistentFunding(gameStateRef.current.totalFunding);
     gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding);
     gameStateRef.current.phase = 'playing';
     setDisplayState({ ...gameStateRef.current });
   }, [persistentUpgrades]);
 
-  // Go back to menu
   const handleMenu = useCallback(() => {
-    // Save funding when going to menu
     setPersistentFunding(gameStateRef.current.totalFunding);
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
     gameStateRef.current.phase = 'menu';
     setDisplayState({ ...gameStateRef.current });
   }, [persistentUpgrades, currentLevel]);
 
-  // Reset all progress
   const handleResetProgress = useCallback(() => {
     if (confirm('Reset all progress? This will erase your upgrades, funding, and level progress.')) {
       localStorage.removeItem('qlearn_progress');
@@ -116,31 +100,23 @@ export default function GameCanvas() {
     }
   }, []);
 
-  // Buy carry capacity upgrade (works in menu and during gameplay)
   const handleBuyCapacity = useCallback(() => {
     const currentCapacity = CARRY_CAPACITY + persistentUpgrades.carryCapacity;
     if (currentCapacity >= MAX_CARRY_CAPACITY) return;
-
-    // Use game state funding if playing, otherwise persistent funding
     const availableFunding = gameStateRef.current.phase === 'playing'
-      ? gameStateRef.current.totalFunding
-      : persistentFunding;
-
+      ? gameStateRef.current.totalFunding : persistentFunding;
     if (availableFunding < UPGRADE_COSTS.carryCapacity) return;
 
     const newUpgrades = { ...persistentUpgrades, carryCapacity: persistentUpgrades.carryCapacity + 1 };
     const newFunding = availableFunding - UPGRADE_COSTS.carryCapacity;
-
     setPersistentUpgrades(newUpgrades);
     setPersistentFunding(newFunding);
 
-    // Update current game state
     if (gameStateRef.current.phase === 'menu') {
       gameStateRef.current = createInitialState(currentLevel, newUpgrades, newFunding);
       gameStateRef.current.phase = 'menu';
       setDisplayState({ ...gameStateRef.current });
     } else if (gameStateRef.current.phase === 'playing') {
-      // Update in-game state
       gameStateRef.current.totalFunding = newFunding;
       gameStateRef.current.upgrades = newUpgrades;
       gameStateRef.current.player.carryCapacity = CARRY_CAPACITY + newUpgrades.carryCapacity;
@@ -148,31 +124,26 @@ export default function GameCanvas() {
     }
   }, [persistentUpgrades, persistentFunding, currentLevel]);
 
-  // Buy sprint power-up (only during gameplay)
   const handleBuySprint = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
     if (gameStateRef.current.totalFunding < UPGRADE_COSTS.sprint) return;
-    if (gameStateRef.current.sprintTimer > 0) return; // Already active
-
+    if (gameStateRef.current.sprintTimer > 0) return;
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.sprint;
     gameStateRef.current.sprintTimer = SPRINT_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
   }, []);
 
-  // Buy no-ICE power-up (only during gameplay)
   const handleBuyNoIce = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
     if (gameStateRef.current.totalFunding < UPGRADE_COSTS.noIce) return;
-    if (gameStateRef.current.noIceTimer > 0) return; // Already active
-
+    if (gameStateRef.current.noIceTimer > 0) return;
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.noIce;
     gameStateRef.current.noIceTimer = NO_ICE_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
   }, []);
 
-  // Joystick handler
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickStateRef.current = { active: true, dx, dy };
   }, []);
@@ -181,28 +152,17 @@ export default function GameCanvas() {
     joystickStateRef.current = { active: false, dx: 0, dy: 0 };
   }, []);
 
-  // Keyboard input setup
   useEffect(() => {
     const isPlayingRef = { current: false };
-
-    const checkPlaying = () => {
-      isPlayingRef.current = gameStateRef.current.phase === 'playing';
-    };
-
+    const checkPlaying = () => { isPlayingRef.current = gameStateRef.current.phase === 'playing'; };
     const interval = setInterval(checkPlaying, 100);
     const cleanup = setupKeyboardListeners(inputStateRef, isPlayingRef);
-
-    return () => {
-      clearInterval(interval);
-      cleanup();
-    };
+    return () => { clearInterval(interval); cleanup(); };
   }, []);
 
-  // Game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -211,38 +171,23 @@ export default function GameCanvas() {
       lastTimeRef.current = timestamp;
       gameTimeRef.current += deltaTime;
 
-      // Update (skip if paused)
       if (gameStateRef.current.phase === 'playing' && !isPaused) {
-        gameStateRef.current = updateGame(
-          gameStateRef.current,
-          inputStateRef.current,
-          joystickStateRef.current,
-          deltaTime
-        );
+        gameStateRef.current = updateGame(gameStateRef.current, inputStateRef.current, joystickStateRef.current, deltaTime);
       }
-
-      // Render
       render(ctx, gameStateRef.current, gameTimeRef.current);
-
-      // Update UI state (~30fps)
-      if (timestamp % 33 < 16) {
-        setDisplayState({ ...gameStateRef.current });
-      }
-
+      if (timestamp % 33 < 16) setDisplayState({ ...gameStateRef.current });
       animationFrameRef.current = requestAnimationFrame(gameLoop);
     };
 
     animationFrameRef.current = requestAnimationFrame(gameLoop);
-
     return () => cancelAnimationFrame(animationFrameRef.current);
   }, [isPaused]);
 
-  // Touch joystick handlers
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (gameStateRef.current.phase !== 'playing') return;
-    e.preventDefault(); // Prevent iOS rubber-banding
+    e.preventDefault();
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY };
   }, []);
@@ -250,17 +195,11 @@ export default function GameCanvas() {
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current || gameStateRef.current.phase !== 'playing') return;
     e.preventDefault();
-
     const touch = e.touches[0];
-    // Dynamic sensitivity based on screen size (smaller screens = more sensitive)
     const sensitivity = Math.min(80, Math.max(30, window.innerWidth / 12));
     const dx = (touch.clientX - touchStartRef.current.x) / sensitivity;
     const dy = (touch.clientY - touchStartRef.current.y) / sensitivity;
-
-    handleJoystickMove(
-      Math.max(-1, Math.min(1, dx)),
-      Math.max(-1, Math.min(1, dy))
-    );
+    handleJoystickMove(Math.max(-1, Math.min(1, dx)), Math.max(-1, Math.min(1, dy)));
   }, [handleJoystickMove]);
 
   const handleTouchEnd = useCallback(() => {
@@ -272,7 +211,6 @@ export default function GameCanvas() {
   const isLose = displayState.phase === 'lose';
   const suspicionPercent = Math.min(100, (displayState.suspicion / MAX_SUSPICION) * 100);
 
-  // Detect if we're on a mobile device in portrait
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
 
   useEffect(() => {
@@ -284,14 +222,11 @@ export default function GameCanvas() {
     return () => window.removeEventListener('resize', checkOrientation);
   }, []);
 
-  // System font stack that works across all devices
-  const systemFont = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-
   return (
     <div
       className="fixed inset-0 overflow-hidden select-none"
       style={{
-        backgroundColor: COLORS.classroomFloor,
+        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         paddingTop: 'env(safe-area-inset-top)',
         paddingBottom: 'env(safe-area-inset-bottom)',
         paddingLeft: 'env(safe-area-inset-left)',
@@ -303,16 +238,13 @@ export default function GameCanvas() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Game canvas - hidden during menu, visible during play */}
-      <div
-        className={`absolute inset-0 flex items-center justify-center ${displayState.phase === 'menu' ? 'hidden' : ''}`}
-        style={{ backgroundColor: '#1a1a2e' }}
-      >
+      {/* Game canvas */}
+      <div className={`absolute inset-0 flex items-center justify-center ${displayState.phase === 'menu' ? 'hidden' : ''}`}>
         <canvas
           ref={canvasRef}
           width={MAP_WIDTH}
           height={MAP_HEIGHT}
-          className="max-w-full max-h-full focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-yellow-400"
+          className="max-w-full max-h-full shadow-2xl rounded-lg"
           style={{
             imageRendering: 'pixelated',
             width: isMobilePortrait ? '100%' : 'auto',
@@ -323,524 +255,369 @@ export default function GameCanvas() {
         />
       </div>
 
-      {/* Menu - Somali Daycare Style - Fullscreen on mobile */}
+      {/* === MENU === */}
       {displayState.phase === 'menu' && (
-        <div className="absolute inset-0 flex items-center justify-center overflow-auto py-4 px-3"
-             style={{ backgroundColor: COLORS.classroomFloor }}
-             role="dialog"
-             aria-label="Main menu"
-             aria-modal="true">
-          {/* Bulletin board background - full width on mobile */}
-          <div className="relative p-4 rounded-lg shadow-2xl w-full max-w-[400px]"
-               style={{
-                 backgroundColor: COLORS.bulletinBoard,
-                 border: '6px solid #8b4513',
-               }}>
-              {/* Pushpins - Somali flag colors */}
-              <div className="absolute -top-2 left-8 w-4 h-4 rounded-full border-2"
-                   style={{ backgroundColor: COLORS.uiBlue, borderColor: '#3070b8' }} />
-              <div className="absolute -top-2 right-8 w-4 h-4 rounded-full bg-white border-2 border-gray-300" />
-              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
-                   style={{ backgroundColor: COLORS.uiBlue }} />
-
-              {/* Title card - Somali flag style */}
-              <div className="text-center p-3 mb-2 -rotate-1 relative overflow-hidden"
-                   style={{ backgroundColor: COLORS.uiBlue }}>
-                {/* White star decoration */}
-                <span className="absolute top-1 right-2 text-white/30 text-lg">★</span>
-                <span className="absolute bottom-1 left-2 text-white/30 text-sm">★</span>
-                <h1 className="text-2xl font-bold text-white"
-                    style={{ fontFamily: systemFont }}>
-                  Q-Learn™
-                </h1>
-                <p className="text-sm text-white/90" style={{ fontFamily: systemFont }}>
-                  Somali Daycare Simulator
-                </p>
-                <p className="text-[10px] text-white/70 mt-1" style={{ fontFamily: systemFont }}>
-                  &quot;Nabad iyo caano&quot; ☆ Peace &amp; Prosperity
-                </p>
+        <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4"
+             style={{ background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)' }}>
+          <div className="card-dark p-6 w-full max-w-[420px] fade-in">
+            {/* Header */}
+            <div className="text-center mb-6">
+              <div className="inline-block px-4 py-2 rounded-full mb-3"
+                   style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
+                <span className="text-white/60 text-xs tracking-widest">SOMALI DAYCARE</span>
               </div>
+              <h1 className="text-4xl font-black text-white text-shadow-lg tracking-tight">
+                Q-Learn<span className="text-[#4189DD]">™</span>
+              </h1>
+              <p className="text-white/50 text-sm mt-1 italic">&quot;Nabad iyo caano&quot; — Peace &amp; Prosperity</p>
+            </div>
 
-              {/* Kid drawing decoration */}
-              <div className="absolute -right-2 top-20 rotate-12 text-2xl opacity-60">🖍️</div>
+            {/* How to Play */}
+            <div className="glass rounded-xl p-4 mb-4">
+              <h2 className="text-white font-bold text-sm mb-2 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[#4189DD] flex items-center justify-center text-xs">?</span>
+                How to Play
+              </h2>
+              <ul className="text-white/70 text-xs space-y-1.5">
+                <li className="flex items-start gap-2"><span className="text-[#4189DD]">→</span> WASD / Arrows / Touch to move</li>
+                <li className="flex items-start gap-2"><span className="text-[#22c55e]">→</span> Collect forms from classrooms</li>
+                <li className="flex items-start gap-2"><span className="text-[#f59e0b]">→</span> Drop forms at the Office desk</li>
+                <li className="flex items-start gap-2"><span className="text-[#ef4444]">→</span> HIDE in rooms when ICE patrols!</li>
+              </ul>
+            </div>
 
-              {/* Instructions card */}
-              <div className="p-2 mb-2 rotate-1"
-                   style={{ backgroundColor: COLORS.uiYellow }}>
-                <h2 className="font-bold mb-1 text-center text-xs"
-                    style={{ fontFamily: systemFont, color: '#333' }}>
-                  📋 How to Play
-                </h2>
-                <ul className="space-y-0 text-xs leading-tight" style={{ fontFamily: systemFont, color: '#333' }}>
-                  <li>• WASD / Arrows / Touch to move</li>
-                  <li>• Collect enrollment forms from classrooms</li>
-                  <li>• Drop forms at the Office desk</li>
-                  <li>• HIDE in rooms when ICE patrols! 🚨</li>
-                </ul>
-              </div>
-
-              {/* Anti-ICE note - looks like a sticky note */}
-              <div className="p-1.5 mb-2 -rotate-2 shadow-md"
-                   style={{ backgroundColor: '#ffb3b3' }}>
-                <p className="text-[10px] text-center font-bold" style={{ fontFamily: systemFont, color: '#8b0000' }}>
-                  ❄️ ICE agents have NO jurisdiction over love ❄️
-                </p>
-              </div>
-
-              {/* Current Level Display */}
-              <div className="p-2 mb-2 -rotate-1"
-                   style={{ backgroundColor: COLORS.uiBlue }}>
-                <h2 className="font-bold text-center text-white"
-                    style={{ fontFamily: systemFont }}>
-                  🏫 {LEVEL_SPECS[currentLevel]?.name || 'Unknown'}
-                </h2>
-                <p className="text-xs text-center text-white/80"
-                   style={{ fontFamily: systemFont }}>
-                  Level {currentLevel + 1} of {LEVEL_SPECS.length}
-                </p>
-              </div>
-
-              {/* Upgrades Section */}
-              <div className="p-2 mb-2 rotate-1"
-                   style={{ backgroundColor: COLORS.uiGreen }}>
-                <div className="flex justify-between items-center mb-1">
-                  <h2 className="font-bold text-xs text-white"
-                      style={{ fontFamily: systemFont }}>
-                    💰 Upgrades
-                  </h2>
-                  <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-bold text-white"
-                        style={{ fontFamily: systemFont }}>
-                    ${persistentFunding}
-                  </span>
+            {/* Current Level */}
+            <div className="rounded-xl p-4 mb-4 relative overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
+              <div className="absolute inset-0 shimmer" />
+              <div className="relative">
+                <span className="text-white/60 text-xs uppercase tracking-wider">Current Level</span>
+                <h3 className="text-white font-bold text-lg">{LEVEL_SPECS[currentLevel]?.name || 'Unknown'}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <div className="h-full bg-white/80 rounded-full" style={{ width: `${((currentLevel + 1) / LEVEL_SPECS.length) * 100}%` }} />
+                  </div>
+                  <span className="text-white/80 text-xs font-medium">{currentLevel + 1}/{LEVEL_SPECS.length}</span>
                 </div>
-
-                <button
-                  onClick={handleBuyCapacity}
-                  disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
-                  className={`w-full p-1.5 rounded text-xs font-bold transition-all ${
-                    persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
-                      ? 'bg-white text-green-700 hover:scale-105'
-                      : 'bg-white/30 text-white/60 cursor-not-allowed'
-                  }`}
-                  style={{ fontFamily: systemFont }}
-                  aria-label={`Buy plus one carry capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Currently ${CARRY_CAPACITY + persistentUpgrades.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
-                >
-                  +1 Capacity (${UPGRADE_COSTS.carryCapacity}) — {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY}
-                </button>
               </div>
+            </div>
 
+            {/* Upgrades */}
+            <div className="rounded-xl p-4 mb-4"
+                 style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-white font-bold text-sm">Upgrades</span>
+                <span className="px-3 py-1 bg-white/20 rounded-full text-white text-sm font-bold">
+                  ${persistentFunding}
+                </span>
+              </div>
               <button
-                onClick={handleStart}
-                className="w-full py-3 text-white text-lg font-bold rounded transform hover:scale-105 transition-all shadow-lg"
-                style={{
-                  fontFamily: systemFont,
-                  backgroundColor: COLORS.uiBlue,
-                  border: '3px solid #3070b8'
-                }}
-                aria-label={`Start game at level ${currentLevel + 1}: ${LEVEL_SPECS[currentLevel]?.name || 'Unknown'}`}
+                onClick={handleBuyCapacity}
+                disabled={persistentFunding < UPGRADE_COSTS.carryCapacity || CARRY_CAPACITY + persistentUpgrades.carryCapacity >= MAX_CARRY_CAPACITY}
+                className={`w-full p-3 rounded-lg font-bold text-sm transition-all ${
+                  persistentFunding >= UPGRADE_COSTS.carryCapacity && CARRY_CAPACITY + persistentUpgrades.carryCapacity < MAX_CARRY_CAPACITY
+                    ? 'bg-white text-green-700 hover:scale-[1.02] active:scale-[0.98] shadow-lg'
+                    : 'bg-white/20 text-white/50 cursor-not-allowed'
+                }`}
               >
-                ▶ START SHIFT
-              </button>
-
-              <p className="mt-2 text-xs text-center" style={{ fontFamily: systemFont, color: '#fff' }}>
-                Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
-              </p>
-
-              {/* Bottom tagline */}
-              <p className="mt-1 text-[9px] text-center opacity-70" style={{ fontFamily: systemFont, color: '#fff' }}>
-                &quot;They can deport people, but they can&apos;t deport community&quot;
-              </p>
-
-              {/* Reset progress button */}
-              <button
-                onClick={handleResetProgress}
-                className="mt-3 text-[10px] text-center opacity-50 hover:opacity-100 transition-opacity underline"
-                style={{ fontFamily: systemFont, color: '#fff' }}
-                aria-label="Reset all game progress including upgrades, funding, and level progression"
-              >
-                Reset Progress
+                <div className="flex justify-between items-center">
+                  <span>+1 Form Capacity</span>
+                  <span>${UPGRADE_COSTS.carryCapacity}</span>
+                </div>
+                <div className="text-xs opacity-70 mt-1">
+                  {CARRY_CAPACITY + persistentUpgrades.carryCapacity}/{MAX_CARRY_CAPACITY} slots
+                </div>
               </button>
             </div>
-          </div>
-        )}
 
-        {/* HUD - Compact overlay */}
-        {displayState.phase === 'playing' && (
-          <>
-            {/* Top bar - Level name and stats */}
-            <div className="absolute top-0 left-0 right-0 flex justify-between items-start p-2 pt-3"
-                 style={{
-                   paddingTop: 'max(12px, calc(env(safe-area-inset-top) + 4px))',
-                   paddingLeft: 'max(8px, env(safe-area-inset-left))',
-                   paddingRight: 'max(8px, env(safe-area-inset-right))',
-                 }}
-                 role="status" aria-live="polite">
-              {/* Left side stats */}
-              <div className="flex gap-1 flex-wrap pointer-events-none" aria-label={`Level: ${LEVEL_SPECS[displayState.level]?.name}, Funding: ${displayState.totalFunding} dollars, Forms: ${displayState.player.carrying} of ${displayState.player.carryCapacity}`}>
-                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
+            {/* Start Button */}
+            <button
+              onClick={handleStart}
+              className="w-full py-4 text-white text-lg font-black rounded-xl btn-primary pulse-glow relative overflow-hidden"
+            >
+              <span className="relative z-10">▶ START SHIFT</span>
+            </button>
+
+            <p className="text-white/40 text-xs text-center mt-4">
+              Get suspicion below {LOSE_THRESHOLD}% to pass inspection
+            </p>
+
+            <button
+              onClick={handleResetProgress}
+              className="w-full mt-4 py-2 text-white/30 text-xs hover:text-white/60 transition-colors"
+            >
+              Reset Progress
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === HUD === */}
+      {displayState.phase === 'playing' && (
+        <>
+          {/* Top Bar */}
+          <div className="absolute top-0 left-0 right-0 p-3 slide-down"
+               style={{
+                 paddingTop: 'max(16px, calc(env(safe-area-inset-top) + 8px))',
+                 paddingLeft: 'max(12px, env(safe-area-inset-left))',
+                 paddingRight: 'max(12px, env(safe-area-inset-right))',
+               }}>
+            <div className="flex justify-between items-start gap-2">
+              {/* Stats */}
+              <div className="flex gap-2 flex-wrap">
+                <div className="badge glass-dark text-white">
                   {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
                 </div>
-                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiGreen, fontFamily: systemFont }}>
+                <div className="badge text-white" style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
                   ${displayState.totalFunding}
                 </div>
-                <div className="px-2 py-0.5 text-xs font-bold text-white rounded"
-                     style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
-                  {displayState.player.carrying}/{displayState.player.carryCapacity} forms
+                <div className="badge glass-dark text-white">
+                  📋 {displayState.player.carrying}/{displayState.player.carryCapacity}
                 </div>
-                {/* Active power-ups */}
                 {displayState.sprintTimer > 0 && (
-                  <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
-                       style={{ backgroundColor: COLORS.uiYellow, fontFamily: systemFont, color: '#333' }}>
-                    SPRINT {Math.ceil(displayState.sprintTimer)}s
+                  <div className="badge animate-pulse" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
+                    ⚡ {Math.ceil(displayState.sprintTimer)}s
                   </div>
                 )}
                 {displayState.noIceTimer > 0 && (
-                  <div className="px-2 py-0.5 text-xs font-bold text-white rounded animate-pulse"
-                       style={{ backgroundColor: COLORS.uiPink, fontFamily: systemFont }}>
-                    NO ICE {Math.ceil(displayState.noIceTimer)}s
+                  <div className="badge animate-pulse" style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}>
+                    🛡️ {Math.ceil(displayState.noIceTimer)}s
                   </div>
                 )}
               </div>
 
-              {/* Right side - Timer and Pause */}
-              <div className="flex gap-1 items-center">
+              {/* Timer & Pause */}
+              <div className="flex gap-2 items-center">
                 <button
                   onClick={() => setIsPaused(true)}
-                  className="px-2 py-0.5 text-xs font-bold rounded hover:scale-105 transition-transform"
-                  style={{ backgroundColor: COLORS.uiPaper, fontFamily: systemFont, color: '#333' }}
-                  aria-label="Pause game">
-                  PAUSE
+                  className="badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer"
+                >
+                  ⏸
                 </button>
-                <div className="px-2 py-0.5 text-sm font-bold rounded pointer-events-none"
-                     style={{ backgroundColor: COLORS.uiPaper, fontFamily: systemFont, color: COLORS.uiCrayon }}
-                     aria-label={`Time remaining: ${Math.ceil(displayState.timeRemaining)} seconds`}>
+                <div className="badge glass-dark text-white font-mono text-base tabular-nums">
                   {Math.ceil(displayState.timeRemaining)}s
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Suspicion meter - horizontal bar at bottom */}
-            <div className="absolute bottom-0 left-0 right-0 p-2 pb-3 pointer-events-none"
-                 style={{
-                   paddingBottom: 'max(12px, calc(env(safe-area-inset-bottom) + 8px))',
-                   paddingLeft: 'max(8px, env(safe-area-inset-left))',
-                   paddingRight: 'max(8px, env(safe-area-inset-right))',
-                 }}
-                 role="progressbar"
-                 aria-valuenow={Math.floor(displayState.suspicion)}
-                 aria-valuemin={0}
-                 aria-valuemax={100}
-                 aria-label={`Suspicion level: ${Math.floor(displayState.suspicion)} percent. Goal: below ${LOSE_THRESHOLD} percent`}>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white" style={{ fontFamily: systemFont }}>
-                  Suspicion
-                </span>
-                <div className="flex-1 h-4 rounded overflow-hidden border-2 relative"
-                     style={{ backgroundColor: COLORS.uiPaper, borderColor: COLORS.uiCrayon }}>
-                  {/* Fill */}
+          {/* Suspicion Bar */}
+          <div className="absolute bottom-0 left-0 right-0 p-3 slide-up"
+               style={{
+                 paddingBottom: 'max(16px, calc(env(safe-area-inset-bottom) + 12px))',
+                 paddingLeft: 'max(12px, env(safe-area-inset-left))',
+                 paddingRight: 'max(12px, env(safe-area-inset-right))',
+               }}>
+            <div className="glass-dark rounded-xl p-3">
+              <div className="flex items-center gap-3">
+                <span className="text-white/60 text-xs font-medium uppercase tracking-wider">Suspicion</span>
+                <div className="flex-1 h-3 bg-black/30 rounded-full overflow-hidden relative">
                   <div
-                    className="absolute top-0 left-0 bottom-0 transition-all duration-300"
+                    className="absolute inset-y-0 left-0 transition-all duration-300 rounded-full"
                     style={{
                       width: `${suspicionPercent}%`,
-                      backgroundColor: suspicionPercent > WARNING_THRESHOLD
-                        ? COLORS.uiRed
+                      background: suspicionPercent > WARNING_THRESHOLD
+                        ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
                         : suspicionPercent > LOSE_THRESHOLD
-                          ? COLORS.uiYellow
-                          : COLORS.uiGreen,
+                          ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
+                          : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
                     }}
                   />
-                  {/* Threshold line at 25% */}
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5"
-                    style={{
-                      left: `${LOSE_THRESHOLD}%`,
-                      backgroundColor: '#000',
-                    }}
-                  />
-                  {/* Percentage text */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs font-bold" style={{ fontFamily: systemFont, color: '#333' }}>
-                      {Math.floor(displayState.suspicion)}% (goal: ≤{LOSE_THRESHOLD}%)
-                    </span>
-                  </div>
+                  <div className="absolute inset-y-0 w-0.5 bg-white/50" style={{ left: `${LOSE_THRESHOLD}%` }} />
                 </div>
-              </div>
-            </div>
-
-            {/* Pause Menu */}
-            {isPaused && !showShop && (
-              <div className="absolute inset-0 flex items-center justify-center p-2"
-                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                   role="dialog"
-                   aria-label="Pause menu"
-                   aria-modal="true">
-                <div className="p-4 rounded-lg shadow-2xl w-[90%] max-w-[280px]"
-                     style={{
-                       backgroundColor: COLORS.uiPaper,
-                       border: `4px solid ${COLORS.uiBlue}`,
-                     }}>
-                  <h2 className="text-xl font-bold text-center mb-4"
-                      style={{ fontFamily: systemFont, color: COLORS.uiBlue }}>
-                    PAUSED
-                  </h2>
-
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => setIsPaused(false)}
-                      className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
-                      style={{
-                        fontFamily: systemFont,
-                        backgroundColor: COLORS.uiGreen,
-                        border: '2px solid #0a8a4d'
-                      }}
-                      aria-label="Resume game"
-                    >
-                      RESUME
-                    </button>
-
-                    <button
-                      onClick={() => setShowShop(true)}
-                      className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
-                      style={{
-                        fontFamily: systemFont,
-                        backgroundColor: COLORS.uiYellow,
-                        color: '#333',
-                        border: '2px solid #d4a844'
-                      }}
-                      aria-label={`Open shop. You have ${displayState.totalFunding} dollars`}
-                    >
-                      SHOP (${displayState.totalFunding})
-                    </button>
-
-                    <button
-                      onClick={() => { setIsPaused(false); handleMenu(); }}
-                      className="w-full py-2 font-bold rounded hover:scale-105 transition-transform"
-                      style={{
-                        fontFamily: systemFont,
-                        backgroundColor: '#ddd',
-                        color: '#333',
-                        border: '2px solid #999'
-                      }}
-                      aria-label="Return to main menu"
-                    >
-                      MAIN MENU
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Shop Modal (from pause menu) */}
-            {isPaused && showShop && (
-              <div className="absolute inset-0 flex items-center justify-center p-2"
-                   style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                   role="dialog"
-                   aria-label="Shop"
-                   aria-modal="true">
-                <div className="p-4 rounded-lg shadow-2xl w-[90%] max-w-[300px]"
-                     style={{
-                       backgroundColor: COLORS.uiPaper,
-                       border: `4px solid ${COLORS.uiGreen}`,
-                     }}>
-                  <div className="flex justify-between items-center mb-3">
-                    <h2 className="text-lg font-bold"
-                        style={{ fontFamily: systemFont, color: COLORS.uiGreen }}>
-                      SHOP
-                    </h2>
-                    <span className="px-2 py-1 rounded font-bold text-white"
-                          style={{ backgroundColor: COLORS.uiGreen, fontFamily: systemFont }}
-                          aria-label={`Available funds: ${displayState.totalFunding} dollars`}>
-                      ${displayState.totalFunding}
-                    </span>
-                  </div>
-
-                  <div className="space-y-2 mb-3" role="group" aria-label="Available upgrades">
-                    {/* Capacity upgrade */}
-                    <button
-                      onClick={handleBuyCapacity}
-                      disabled={displayState.totalFunding < UPGRADE_COSTS.carryCapacity || displayState.player.carryCapacity >= MAX_CARRY_CAPACITY}
-                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
-                        displayState.totalFunding >= UPGRADE_COSTS.carryCapacity && displayState.player.carryCapacity < MAX_CARRY_CAPACITY
-                          ? 'bg-green-500 text-white hover:bg-green-600'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                      style={{ fontFamily: systemFont }}
-                      aria-label={`Buy plus one form capacity for ${UPGRADE_COSTS.carryCapacity} dollars. Current capacity: ${displayState.player.carryCapacity} of ${MAX_CARRY_CAPACITY}`}
-                    >
-                      +1 Form Capacity (${UPGRADE_COSTS.carryCapacity})
-                      <div className="text-xs opacity-80">
-                        Current: {displayState.player.carryCapacity}/{MAX_CARRY_CAPACITY}
-                      </div>
-                    </button>
-
-                    {/* Sprint power-up */}
-                    <button
-                      onClick={handleBuySprint}
-                      disabled={displayState.totalFunding < UPGRADE_COSTS.sprint || displayState.sprintTimer > 0}
-                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
-                        displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0
-                          ? 'text-white hover:opacity-90'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                      style={{
-                        fontFamily: systemFont,
-                        backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? COLORS.uiYellow : undefined,
-                        color: displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0 ? '#333' : undefined
-                      }}
-                      aria-label={`Buy sprint power-up for ${UPGRADE_COSTS.sprint} dollars. ${displayState.sprintTimer > 0 ? `Currently active: ${Math.ceil(displayState.sprintTimer)} seconds remaining` : `Gives ${SPRINT_DURATION} seconds of speed boost`}`}
-                    >
-                      SPRINT (${UPGRADE_COSTS.sprint})
-                      <div className="text-xs opacity-80">
-                        {displayState.sprintTimer > 0 ? `Active: ${Math.ceil(displayState.sprintTimer)}s` : `${SPRINT_DURATION}s speed boost`}
-                      </div>
-                    </button>
-
-                    {/* No ICE power-up */}
-                    <button
-                      onClick={handleBuyNoIce}
-                      disabled={displayState.totalFunding < UPGRADE_COSTS.noIce || displayState.noIceTimer > 0}
-                      className={`w-full p-2 rounded text-sm font-bold transition-all ${
-                        displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0
-                          ? 'text-white hover:opacity-90'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                      style={{
-                        fontFamily: systemFont,
-                        backgroundColor: displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0 ? COLORS.uiPink : undefined
-                      }}
-                      aria-label={`Buy no ICE power-up for ${UPGRADE_COSTS.noIce} dollars. ${displayState.noIceTimer > 0 ? `Currently active: ${Math.ceil(displayState.noIceTimer)} seconds remaining` : `Gives ${NO_ICE_DURATION} seconds of ICE-free time`}`}
-                    >
-                      NO ICE (${UPGRADE_COSTS.noIce})
-                      <div className="text-xs opacity-80">
-                        {displayState.noIceTimer > 0 ? `Active: ${Math.ceil(displayState.noIceTimer)}s` : `${NO_ICE_DURATION}s ICE-free`}
-                      </div>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => setShowShop(false)}
-                    className="w-full py-2 text-white font-bold rounded hover:scale-105 transition-transform"
-                    style={{
-                      fontFamily: systemFont,
-                      backgroundColor: COLORS.uiBlue,
-                      border: '2px solid #3070b8'
-                    }}
-                    aria-label="Go back to pause menu"
-                  >
-                    BACK
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* End Screen - Construction Paper Style */}
-        {(isWin || isLose) && (
-          <div className="absolute inset-0 flex items-center justify-center p-2"
-               style={{ backgroundColor: isWin ? 'rgba(29, 209, 161, 0.9)' : 'rgba(255, 107, 107, 0.9)' }}
-               role="dialog"
-               aria-label={isWin ? 'Level complete' : 'Game over'}
-               aria-modal="true">
-            <div className="p-4 sm:p-6 rounded-lg shadow-2xl w-[90%] max-w-[380px]"
-                 style={{
-                   backgroundColor: COLORS.uiPaper,
-                   border: `6px solid ${isWin ? COLORS.uiGreen : COLORS.uiRed}`,
-                   transform: 'rotate(-1deg)'
-                 }}>
-              {/* Level name */}
-              <div className="text-center mb-2">
-                <span className="px-3 py-1 text-sm font-bold text-white"
-                      style={{ backgroundColor: COLORS.uiBlue, fontFamily: systemFont }}>
-                  {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
+                <span className={`text-sm font-bold tabular-nums ${
+                  suspicionPercent > WARNING_THRESHOLD ? 'text-red-400' :
+                  suspicionPercent > LOSE_THRESHOLD ? 'text-yellow-400' : 'text-green-400'
+                }`}>
+                  {Math.floor(displayState.suspicion)}%
                 </span>
               </div>
-
-              <h1 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-3 text-center"
-                  style={{
-                    fontFamily: systemFont,
-                    color: isWin ? COLORS.uiGreen : COLORS.uiRed
-                  }}>
-                {isWin
-                  ? (displayState.level >= LEVEL_SPECS.length - 1 ? 'GAME COMPLETE!' : 'INSPECTION PASSED!')
-                  : 'BUSTED!'}
-              </h1>
-
-              <p className="text-sm sm:text-base mb-3 sm:mb-4 text-center"
-                 style={{ fontFamily: systemFont, color: COLORS.uiCrayon }}>
-                {isWin
-                  ? (displayState.level >= LEVEL_SPECS.length - 1
-                      ? 'You saved all the daycares! Quality outcomes achieved.'
-                      : 'Level complete! Ready for the next daycare?')
-                  : 'An independent journalist caught you with ICE!'}
-              </p>
-
-              <div className="grid grid-cols-2 gap-1 sm:gap-2 mb-3 sm:mb-4" role="group" aria-label="Level statistics">
-                <div className="p-1.5 sm:p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiGreen }} aria-label={`Enrollments: ${displayState.enrollments}`}>
-                  <div className="text-lg sm:text-xl font-bold text-white">{displayState.enrollments}</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Enrollments</div>
-                </div>
-                <div className="p-1.5 sm:p-2 text-center rotate-1" style={{ backgroundColor: COLORS.uiYellow }} aria-label={`Total funding saved: ${displayState.totalFunding} dollars`}>
-                  <div className="text-lg sm:text-xl font-bold text-gray-800">${displayState.totalFunding}</div>
-                  <div className="text-[10px] sm:text-xs text-gray-700" style={{ fontFamily: systemFont }}>Total Saved</div>
-                </div>
-                <div className="p-1.5 sm:p-2 text-center rotate-1" style={{ backgroundColor: displayState.suspicion <= LOSE_THRESHOLD ? COLORS.uiGreen : COLORS.uiRed }} aria-label={`Suspicion: ${Math.floor(displayState.suspicion)} percent, ${displayState.suspicion <= LOSE_THRESHOLD ? 'goal met' : 'goal not met'}`}>
-                  <div className="text-lg sm:text-xl font-bold text-white">{Math.floor(displayState.suspicion)}%</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
-                </div>
-                <div className="p-1.5 sm:p-2 text-center -rotate-1" style={{ backgroundColor: COLORS.uiBlue }} aria-label={`Carry capacity: ${CARRY_CAPACITY + persistentUpgrades.carryCapacity}`}>
-                  <div className="text-lg sm:text-xl font-bold text-white">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
-                  <div className="text-[10px] sm:text-xs text-white/80" style={{ fontFamily: systemFont }}>Carry Cap</div>
-                </div>
+              <div className="text-white/40 text-[10px] text-center mt-1">
+                Goal: ≤{LOSE_THRESHOLD}%
               </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 mb-2">
-                <button
-                  onClick={handleRestart}
-                  className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
-                  style={{
-                    fontFamily: systemFont,
-                    backgroundColor: isWin ? COLORS.uiGreen : COLORS.uiRed,
-                    border: `3px solid ${isWin ? '#0a8a4d' : '#cc5555'}`
-                  }}
-                  aria-label="Retry this level"
-                >
-                  RETRY
-                </button>
-                {isWin && displayState.level < LEVEL_SPECS.length - 1 && (
-                  <button
-                    onClick={handleNextLevel}
-                    className="flex-1 py-2 text-white text-base font-bold rounded transform hover:scale-105 transition-all shadow-lg"
-                    style={{
-                      fontFamily: systemFont,
-                      backgroundColor: COLORS.uiBlue,
-                      border: '3px solid #3070b8'
-                    }}
-                    aria-label={`Go to next level: ${LEVEL_SPECS[displayState.level + 1]?.name || 'Unknown'}`}
-                  >
-                    NEXT →
-                  </button>
-                )}
-              </div>
-
-              <button
-                onClick={handleMenu}
-                className="w-full py-2 text-gray-800 text-sm font-bold rounded transform hover:scale-105 transition-all"
-                style={{
-                  fontFamily: systemFont,
-                  backgroundColor: '#ddd',
-                  border: '2px solid #999'
-                }}
-                aria-label="Return to main menu"
-              >
-                MENU
-              </button>
             </div>
           </div>
-        )}
+
+          {/* Pause Menu */}
+          {isPaused && !showShop && (
+            <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
+                 style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+              <div className="card p-6 w-full max-w-[300px] bounce-in">
+                <h2 className="text-2xl font-black text-center mb-6 text-gray-800">PAUSED</h2>
+                <div className="space-y-3">
+                  <button onClick={() => setIsPaused(false)} className="w-full py-3 text-white font-bold rounded-xl btn-success">
+                    ▶ RESUME
+                  </button>
+                  <button onClick={() => setShowShop(true)} className="w-full py-3 font-bold rounded-xl btn-warning text-gray-900">
+                    🛒 SHOP (${displayState.totalFunding})
+                  </button>
+                  <button
+                    onClick={() => { setIsPaused(false); handleMenu(); }}
+                    className="w-full py-3 font-bold rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
+                  >
+                    ← MAIN MENU
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Shop */}
+          {isPaused && showShop && (
+            <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
+                 style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+              <div className="card p-6 w-full max-w-[340px] bounce-in">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-black text-gray-800">SHOP</h2>
+                  <span className="px-3 py-1.5 rounded-full font-bold text-white text-sm"
+                        style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
+                    ${displayState.totalFunding}
+                  </span>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <button
+                    onClick={handleBuyCapacity}
+                    disabled={displayState.totalFunding < UPGRADE_COSTS.carryCapacity || displayState.player.carryCapacity >= MAX_CARRY_CAPACITY}
+                    className={`w-full p-4 rounded-xl text-left transition-all ${
+                      displayState.totalFunding >= UPGRADE_COSTS.carryCapacity && displayState.player.carryCapacity < MAX_CARRY_CAPACITY
+                        ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex justify-between font-bold">
+                      <span>📋 +1 Form Capacity</span>
+                      <span>${UPGRADE_COSTS.carryCapacity}</span>
+                    </div>
+                    <div className="text-xs opacity-80 mt-1">{displayState.player.carryCapacity}/{MAX_CARRY_CAPACITY} slots</div>
+                  </button>
+
+                  <button
+                    onClick={handleBuySprint}
+                    disabled={displayState.totalFunding < UPGRADE_COSTS.sprint || displayState.sprintTimer > 0}
+                    className={`w-full p-4 rounded-xl text-left transition-all ${
+                      displayState.totalFunding >= UPGRADE_COSTS.sprint && displayState.sprintTimer <= 0
+                        ? 'bg-amber-500 text-gray-900 hover:bg-amber-600 shadow-lg'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex justify-between font-bold">
+                      <span>⚡ Sprint Boost</span>
+                      <span>${UPGRADE_COSTS.sprint}</span>
+                    </div>
+                    <div className="text-xs opacity-80 mt-1">
+                      {displayState.sprintTimer > 0 ? `Active: ${Math.ceil(displayState.sprintTimer)}s` : `${SPRINT_DURATION}s speed boost`}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={handleBuyNoIce}
+                    disabled={displayState.totalFunding < UPGRADE_COSTS.noIce || displayState.noIceTimer > 0}
+                    className={`w-full p-4 rounded-xl text-left transition-all ${
+                      displayState.totalFunding >= UPGRADE_COSTS.noIce && displayState.noIceTimer <= 0
+                        ? 'bg-purple-500 text-white hover:bg-purple-600 shadow-lg'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    <div className="flex justify-between font-bold">
+                      <span>🛡️ ICE Shield</span>
+                      <span>${UPGRADE_COSTS.noIce}</span>
+                    </div>
+                    <div className="text-xs opacity-80 mt-1">
+                      {displayState.noIceTimer > 0 ? `Active: ${Math.ceil(displayState.noIceTimer)}s` : `${NO_ICE_DURATION}s protection`}
+                    </div>
+                  </button>
+                </div>
+
+                <button onClick={() => setShowShop(false)} className="w-full py-3 font-bold rounded-xl btn-primary text-white">
+                  ← BACK
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* === END SCREEN === */}
+      {(isWin || isLose) && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
+             style={{
+               background: isWin
+                 ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%)'
+                 : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
+               backdropFilter: 'blur(8px)',
+             }}>
+          <div className="card p-6 w-full max-w-[400px] bounce-in">
+            {/* Level badge */}
+            <div className="text-center mb-2">
+              <span className="inline-block px-4 py-1 rounded-full text-white text-sm font-medium"
+                    style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
+                {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
+              </span>
+            </div>
+
+            <h1 className={`text-3xl font-black text-center mb-2 ${isWin ? 'text-green-600' : 'text-red-600'}`}>
+              {isWin
+                ? (displayState.level >= LEVEL_SPECS.length - 1 ? '🎉 GAME COMPLETE!' : '✓ INSPECTION PASSED!')
+                : '✗ BUSTED!'}
+            </h1>
+
+            <p className="text-gray-600 text-sm text-center mb-4">
+              {isWin
+                ? (displayState.level >= LEVEL_SPECS.length - 1
+                    ? 'You saved all the daycares!'
+                    : 'Ready for the next daycare?')
+                : 'An independent journalist caught you!'}
+            </p>
+
+            {/* Stats */}
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div className="p-3 rounded-xl text-center text-white"
+                   style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
+                <div className="text-2xl font-black">{displayState.enrollments}</div>
+                <div className="text-xs opacity-80">Enrollments</div>
+              </div>
+              <div className="p-3 rounded-xl text-center"
+                   style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
+                <div className="text-2xl font-black">${displayState.totalFunding}</div>
+                <div className="text-xs opacity-80">Saved</div>
+              </div>
+              <div className={`p-3 rounded-xl text-center text-white`}
+                   style={{
+                     background: displayState.suspicion <= LOSE_THRESHOLD
+                       ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                       : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                   }}>
+                <div className="text-2xl font-black">{Math.floor(displayState.suspicion)}%</div>
+                <div className="text-xs opacity-80">Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
+              </div>
+              <div className="p-3 rounded-xl text-center text-white"
+                   style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
+                <div className="text-2xl font-black">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
+                <div className="text-xs opacity-80">Capacity</div>
+              </div>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-2 mb-2">
+              <button onClick={handleRestart}
+                      className={`flex-1 py-3 text-white font-bold rounded-xl ${isWin ? 'btn-success' : 'btn-danger'}`}>
+                ↻ RETRY
+              </button>
+              {isWin && displayState.level < LEVEL_SPECS.length - 1 && (
+                <button onClick={handleNextLevel} className="flex-1 py-3 text-white font-bold rounded-xl btn-primary">
+                  NEXT →
+                </button>
+              )}
+            </div>
+
+            <button onClick={handleMenu}
+                    className="w-full py-2 font-medium rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+              ← Menu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
