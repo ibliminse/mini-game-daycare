@@ -4,12 +4,12 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 
 export type MusicTrack = 'menu' | 'gameplay' | 'none';
 
-// Free music sources (royalty-free from Pixabay)
+// Free music sources (Creative Commons from Archive.org)
 const MUSIC_URLS = {
-  // Somali-inspired/African rhythmic music for menu
-  menu: 'https://cdn.pixabay.com/audio/2024/02/14/audio_08e717c8b5.mp3', // African drums
-  // Action/USA style music for gameplay
-  gameplay: 'https://cdn.pixabay.com/audio/2022/10/25/audio_b58b39f06e.mp3', // Upbeat action
+  // African drums for menu (CC BY-NC-SA 3.0 - Cyberdread)
+  menu: 'https://archive.org/download/Mwcd003-HiFiAfricanDrums/01-Hi-fiAfricanDrums-TrumpetVers_64kb.mp3',
+  // Upbeat video game music for gameplay (CC BY-NC-SA 4.0 - Dan Lizard)
+  gameplay: 'https://archive.org/download/videogamemusic_20180625/03-Stage1sid6581858012bit32khz.mp3',
 };
 
 export function useAudio() {
