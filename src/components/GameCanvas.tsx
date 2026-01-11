@@ -311,65 +311,32 @@ export default function GameCanvas() {
     >
       {/* Game canvas */}
       {displayState.phase !== 'menu' && (
-        <>
-          {/* Desktop/non-mobile view */}
-          {!isMobileLandscape && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <canvas
-                ref={canvasRef}
-                width={MAP_WIDTH}
-                height={MAP_HEIGHT}
-                className="max-w-full max-h-full shadow-2xl rounded-lg"
-                style={{
-                  imageRendering: 'pixelated',
-                  height: '100%',
-                }}
-                aria-label="Game canvas - use arrow keys or WASD to move"
-                tabIndex={0}
-              />
-            </div>
-          )}
-
-          {/* Mobile landscape with handheld overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          {/* Handheld overlay frame for mobile landscape */}
           {isMobileLandscape && (
-            <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
-              {/* Handheld frame container */}
-              <div
-                className="relative"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  maxHeight: '100vh',
-                  backgroundImage: 'url(/overlay/handheld-landscape.png)',
-                  backgroundSize: 'contain',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                }}
-              >
-                {/* Canvas positioned inside the "screen" area */}
-                <canvas
-                  ref={canvasRef}
-                  width={MAP_WIDTH}
-                  height={MAP_HEIGHT}
-                  className="absolute"
-                  style={{
-                    imageRendering: 'pixelated',
-                    // Position canvas in the screen area of the handheld
-                    // These values approximate the screen area in the overlay
-                    left: '50%',
-                    top: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    width: '42%',
-                    height: '58%',
-                    borderRadius: '4px',
-                  }}
-                  aria-label="Game canvas - use virtual joystick to move"
-                  tabIndex={0}
-                />
-              </div>
-            </div>
+            <div
+              className="absolute inset-0 pointer-events-none z-10"
+              style={{
+                backgroundImage: 'url(/overlay/handheld-landscape.png)',
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+              }}
+            />
           )}
-        </>
+          <canvas
+            ref={canvasRef}
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            className="max-w-full max-h-full shadow-2xl rounded-lg"
+            style={{
+              imageRendering: 'pixelated',
+              height: isMobileLandscape ? '55%' : '100%',
+            }}
+            aria-label="Game canvas - use arrow keys or WASD to move"
+            tabIndex={0}
+          />
+        </div>
       )}
 
 
