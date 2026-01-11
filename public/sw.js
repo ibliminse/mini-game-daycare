@@ -10,6 +10,8 @@ const PRECACHE_ASSETS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/overlay/handheld-landscape.png',
+  '/audio/menu.mp3',
+  '/audio/gameplay.mp3',
 ];
 
 // Install event - cache core assets

@@ -4,12 +4,12 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 
 export type MusicTrack = 'menu' | 'gameplay' | 'none';
 
-// Free music sources (Creative Commons from Archive.org)
+// Local audio files (Creative Commons licensed)
+// Menu: Hi-Fi African Drums by Cyberdread (CC BY-NC-SA 3.0)
+// Gameplay: Video Game Music by Dan Lizard (CC BY-NC-SA 4.0)
 const MUSIC_URLS = {
-  // African drums for menu (CC BY-NC-SA 3.0 - Cyberdread)
-  menu: 'https://archive.org/download/Mwcd003-HiFiAfricanDrums/01-Hi-fiAfricanDrums-TrumpetVers_64kb.mp3',
-  // Upbeat video game music for gameplay (CC BY-NC-SA 4.0 - Dan Lizard)
-  gameplay: 'https://archive.org/download/videogamemusic_20180625/03-Stage1sid6581858012bit32khz.mp3',
+  menu: '/audio/menu.mp3',
+  gameplay: '/audio/gameplay.mp3',
 };
 
 export function useAudio() {
