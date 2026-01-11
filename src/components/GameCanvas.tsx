@@ -467,52 +467,52 @@ export default function GameCanvas() {
       {displayState.phase === 'playing' && (
         <>
           {/* Top Bar */}
-          <div className="absolute top-0 left-0 right-0 p-3 slide-down"
+          <div className="absolute top-0 left-0 right-0 p-2 slide-down"
                style={{
-                 paddingTop: 'max(16px, calc(env(safe-area-inset-top) + 8px))',
-                 paddingLeft: 'max(12px, env(safe-area-inset-left))',
-                 paddingRight: 'max(12px, env(safe-area-inset-right))',
+                 paddingTop: 'max(8px, calc(env(safe-area-inset-top) + 4px))',
+                 paddingLeft: 'max(8px, env(safe-area-inset-left))',
+                 paddingRight: 'max(8px, env(safe-area-inset-right))',
                }}>
-            <div className="flex justify-between items-start gap-2">
-              {/* Stats */}
-              <div className="flex gap-2 flex-wrap">
-                <div className="badge glass-dark text-white">
-                  {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
+            <div className="flex justify-between items-center gap-1">
+              {/* Stats - more compact on mobile */}
+              <div className="flex gap-1 flex-wrap items-center">
+                <div className={`badge glass-dark text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}>
+                  {isMobileLandscape ? LEVEL_SPECS[displayState.level]?.name?.split(' ')[0] : LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
                 </div>
-                <div className="badge text-white" style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
+                <div className={`badge text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
                   ${displayState.totalFunding}
                 </div>
-                <div className="badge glass-dark text-white">
+                <div className={`badge glass-dark text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}>
                   📋 {displayState.player.carrying}/{displayState.player.carryCapacity}
                 </div>
                 {displayState.sprintTimer > 0 && (
-                  <div className="badge animate-pulse" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
+                  <div className={`badge animate-pulse ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
                     ⚡ {Math.ceil(displayState.sprintTimer)}s
                   </div>
                 )}
                 {displayState.noIceTimer > 0 && (
-                  <div className="badge animate-pulse" style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}>
+                  <div className={`badge animate-pulse ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}>
                     🛡️ {Math.ceil(displayState.noIceTimer)}s
                   </div>
                 )}
               </div>
 
               {/* Timer & Controls */}
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-1 items-center">
                 <button
                   onClick={toggleMute}
-                  className="badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer"
+                  className={`badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}
                   title={isMuted ? 'Unmute music' : 'Mute music'}
                 >
                   {isMuted ? '🔇' : '🎵'}
                 </button>
                 <button
                   onClick={() => setIsPaused(true)}
-                  className="badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer"
+                  className={`badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}
                 >
                   ⏸
                 </button>
-                <div className="badge glass-dark text-white font-mono text-base tabular-nums">
+                <div className={`badge glass-dark text-white font-mono tabular-nums ${isMobileLandscape ? 'text-xs px-2 py-0.5' : 'text-base'}`}>
                   {Math.ceil(displayState.timeRemaining)}s
                 </div>
               </div>
@@ -520,16 +520,20 @@ export default function GameCanvas() {
           </div>
 
           {/* Suspicion Bar */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 slide-up"
+          <div className="absolute bottom-0 left-0 slide-up"
                style={{
-                 paddingBottom: 'max(16px, calc(env(safe-area-inset-bottom) + 12px))',
-                 paddingLeft: 'max(12px, env(safe-area-inset-left))',
-                 paddingRight: 'max(12px, env(safe-area-inset-right))',
+                 paddingBottom: 'max(8px, calc(env(safe-area-inset-bottom) + 4px))',
+                 paddingLeft: 'max(8px, env(safe-area-inset-left))',
+                 // Leave room for joystick on right side on mobile
+                 right: isMobileLandscape ? '140px' : '0',
+                 paddingRight: isMobileLandscape ? '8px' : 'max(8px, env(safe-area-inset-right))',
                }}>
-            <div className="glass-dark rounded-xl p-3">
-              <div className="flex items-center gap-3">
-                <span className="text-white/60 text-xs font-medium uppercase tracking-wider">Suspicion</span>
-                <div className="flex-1 h-3 bg-black/30 rounded-full overflow-hidden relative">
+            <div className={`glass-dark rounded-xl ${isMobileLandscape ? 'p-2' : 'p-3'}`}>
+              <div className={`flex items-center ${isMobileLandscape ? 'gap-2' : 'gap-3'}`}>
+                <span className={`text-white/60 font-medium uppercase tracking-wider ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>
+                  {isMobileLandscape ? 'SUS' : 'Suspicion'}
+                </span>
+                <div className={`flex-1 bg-black/30 rounded-full overflow-hidden relative ${isMobileLandscape ? 'h-2' : 'h-3'}`}>
                   <div
                     className="absolute inset-y-0 left-0 transition-all duration-300 rounded-full"
                     style={{
@@ -543,16 +547,18 @@ export default function GameCanvas() {
                   />
                   <div className="absolute inset-y-0 w-0.5 bg-white/50" style={{ left: `${LOSE_THRESHOLD}%` }} />
                 </div>
-                <span className={`text-sm font-bold tabular-nums ${
+                <span className={`font-bold tabular-nums ${isMobileLandscape ? 'text-xs' : 'text-sm'} ${
                   suspicionPercent > WARNING_THRESHOLD ? 'text-red-400' :
                   suspicionPercent > LOSE_THRESHOLD ? 'text-yellow-400' : 'text-green-400'
                 }`}>
                   {Math.floor(displayState.suspicion)}%
                 </span>
               </div>
-              <div className="text-white/40 text-[10px] text-center mt-1">
-                Goal: ≤{LOSE_THRESHOLD}%
-              </div>
+              {!isMobileLandscape && (
+                <div className="text-white/40 text-[10px] text-center mt-1">
+                  Goal: ≤{LOSE_THRESHOLD}%
+                </div>
+              )}
             </div>
           </div>
 
@@ -786,7 +792,7 @@ export default function GameCanvas() {
         </div>
       )}
 
-      {/* === MOBILE LANDSCAPE JOYSTICK === */}
+      {/* === MOBILE LANDSCAPE JOYSTICK (bottom right) === */}
       {isMobileLandscape && displayState.phase === 'playing' && !isPaused && (
         <div
           ref={joystickRef}
@@ -794,8 +800,8 @@ export default function GameCanvas() {
           style={{
             width: joystickSettings.size,
             height: joystickSettings.size,
-            [joystickSettings.side]: joystickSettings.offsetX,
-            bottom: `calc(80px + ${joystickSettings.offsetY}px)`,
+            right: `max(${joystickSettings.offsetX}px, env(safe-area-inset-right))`,
+            bottom: `calc(90px + ${joystickSettings.offsetY}px + env(safe-area-inset-bottom))`,
             background: `rgba(255, 255, 255, ${joystickSettings.opacity * 0.3})`,
             border: `3px solid rgba(255, 255, 255, ${joystickSettings.opacity})`,
             touchAction: 'none',
