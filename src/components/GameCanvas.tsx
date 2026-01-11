@@ -196,7 +196,7 @@ export default function GameCanvas() {
 
     animationFrameRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isPaused]);
+  }, [isPaused, displayState.phase]);
 
   const isWin = displayState.phase === 'win';
   const isLose = displayState.phase === 'lose';
