@@ -1,4 +1,5 @@
-const CACHE_NAME = 'qlearn-v1.0.0';
+// Service Worker for Learing - Somali Daycare Simulator
+const CACHE_NAME = 'learing-v1.0.0';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache immediately on install
@@ -6,6 +7,9 @@ const PRECACHE_ASSETS = [
   '/',
   '/offline.html',
   '/manifest.json',
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/overlay/handheld-landscape.png',
 ];
 
 // Install event - cache core assets
@@ -43,6 +47,10 @@ self.addEventListener('fetch', (event) => {
 
   // Skip chrome-extension and other non-http requests
   if (!event.request.url.startsWith('http')) return;
+
+  // Skip external resources (audio from Pixabay, etc.)
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
     fetch(event.request)

@@ -198,43 +198,24 @@ export default function GameCanvas() {
     return () => cancelAnimationFrame(animationFrameRef.current);
   }, [isPaused]);
 
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (gameStateRef.current.phase !== 'playing') return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!touchStartRef.current || gameStateRef.current.phase !== 'playing') return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const sensitivity = Math.min(80, Math.max(30, window.innerWidth / 12));
-    const dx = (touch.clientX - touchStartRef.current.x) / sensitivity;
-    const dy = (touch.clientY - touchStartRef.current.y) / sensitivity;
-    handleJoystickMove(Math.max(-1, Math.min(1, dx)), Math.max(-1, Math.min(1, dy)));
-  }, [handleJoystickMove]);
-
-  const handleTouchEnd = useCallback(() => {
-    touchStartRef.current = null;
-    handleJoystickEnd();
-  }, [handleJoystickEnd]);
-
   const isWin = displayState.phase === 'win';
   const isLose = displayState.phase === 'lose';
   const suspicionPercent = Math.min(100, (displayState.suspicion / MAX_SUSPICION) * 100);
 
+  const [isMobile, setIsMobile] = useState(false);
   const [isMobilePortrait, setIsMobilePortrait] = useState(false);
   const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 
   useEffect(() => {
     const checkOrientation = () => {
-      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const mobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isPortrait = window.innerHeight > window.innerWidth;
       const isLandscape = window.innerWidth > window.innerHeight;
-      setIsMobilePortrait(window.innerWidth < 768 && window.innerHeight > window.innerWidth);
-      setIsMobileLandscape(isMobile && isLandscape && window.innerHeight < 500);
+      setIsMobile(mobile);
+      // Portrait: mobile device in portrait orientation
+      setIsMobilePortrait(mobile && isPortrait);
+      // Landscape: mobile device in landscape orientation
+      setIsMobileLandscape(mobile && isLandscape);
     };
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
@@ -249,6 +230,34 @@ export default function GameCanvas() {
   const joystickRef = useRef<HTMLDivElement>(null);
   const [joystickActive, setJoystickActive] = useState(false);
   const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
+
+  // Joystick customization settings
+  const [joystickSettings, setJoystickSettings] = useState({
+    side: 'right' as 'left' | 'right',
+    size: 96, // pixels
+    opacity: 0.5,
+    offsetX: 16, // distance from edge
+    offsetY: 16, // distance from bottom
+  });
+  const [showJoystickSettings, setShowJoystickSettings] = useState(false);
+
+  // Load joystick settings from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('qlearn_joystick_settings');
+      if (saved) {
+        setJoystickSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Save joystick settings to localStorage
+  const saveJoystickSettings = useCallback((settings: typeof joystickSettings) => {
+    setJoystickSettings(settings);
+    try {
+      localStorage.setItem('qlearn_joystick_settings', JSON.stringify(settings));
+    } catch { /* ignore */ }
+  }, []);
 
   const handleVirtualJoystickStart = useCallback((e: React.TouchEvent) => {
     if (!joystickRef.current) return;
@@ -299,26 +308,70 @@ export default function GameCanvas() {
       }}
       role="application"
       aria-label="Q-Learn Daycare Simulator Game"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Game canvas */}
-      <div className={`absolute inset-0 flex items-center justify-center ${displayState.phase === 'menu' ? 'hidden' : ''}`}>
-        <canvas
-          ref={canvasRef}
-          width={MAP_WIDTH}
-          height={MAP_HEIGHT}
-          className="max-w-full max-h-full shadow-2xl rounded-lg"
-          style={{
-            imageRendering: 'pixelated',
-            width: isMobilePortrait ? '100%' : 'auto',
-            height: isMobilePortrait ? 'auto' : '100%',
-          }}
-          aria-label="Game canvas - use arrow keys or WASD to move"
-          tabIndex={0}
-        />
-      </div>
+      {displayState.phase !== 'menu' && (
+        <>
+          {/* Desktop/non-mobile view */}
+          {!isMobileLandscape && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <canvas
+                ref={canvasRef}
+                width={MAP_WIDTH}
+                height={MAP_HEIGHT}
+                className="max-w-full max-h-full shadow-2xl rounded-lg"
+                style={{
+                  imageRendering: 'pixelated',
+                  height: '100%',
+                }}
+                aria-label="Game canvas - use arrow keys or WASD to move"
+                tabIndex={0}
+              />
+            </div>
+          )}
+
+          {/* Mobile landscape with handheld overlay */}
+          {isMobileLandscape && (
+            <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+              {/* Handheld frame container */}
+              <div
+                className="relative"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  maxHeight: '100vh',
+                  backgroundImage: 'url(/overlay/handheld-landscape.png)',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                }}
+              >
+                {/* Canvas positioned inside the "screen" area */}
+                <canvas
+                  ref={canvasRef}
+                  width={MAP_WIDTH}
+                  height={MAP_HEIGHT}
+                  className="absolute"
+                  style={{
+                    imageRendering: 'pixelated',
+                    // Position canvas in the screen area of the handheld
+                    // These values approximate the screen area in the overlay
+                    left: '50%',
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '42%',
+                    height: '58%',
+                    borderRadius: '4px',
+                  }}
+                  aria-label="Game canvas - use virtual joystick to move"
+                  tabIndex={0}
+                />
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
 
       {/* === MENU === */}
       {displayState.phase === 'menu' && (
@@ -536,52 +589,8 @@ export default function GameCanvas() {
             </div>
           </div>
 
-          {/* Mobile Landscape Virtual Joystick */}
-          {isMobileLandscape && !isPaused && (
-            <>
-              {/* Left Joystick */}
-              <div
-                ref={joystickRef}
-                className="absolute left-4 bottom-4 w-24 h-24 rounded-full flex items-center justify-center"
-                style={{
-                  background: 'rgba(255,255,255,0.15)',
-                  border: '3px solid rgba(255,255,255,0.3)',
-                  backdropFilter: 'blur(4px)',
-                }}
-                onTouchStart={handleVirtualJoystickStart}
-                onTouchMove={handleVirtualJoystickMove}
-                onTouchEnd={handleVirtualJoystickEnd}
-              >
-                {/* Inner stick */}
-                <div
-                  className="w-10 h-10 rounded-full transition-transform"
-                  style={{
-                    background: 'rgba(255,255,255,0.5)',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                    transform: `translate(${joystickPos.x}px, ${joystickPos.y}px)`,
-                  }}
-                />
-              </div>
-
-              {/* Right side action buttons (optional sprint/pause) */}
-              <div className="absolute right-4 bottom-4 flex flex-col gap-2">
-                <button
-                  onClick={() => setIsPaused(true)}
-                  className="w-14 h-14 rounded-full flex items-center justify-center text-xl"
-                  style={{
-                    background: 'rgba(255,255,255,0.15)',
-                    border: '3px solid rgba(255,255,255,0.3)',
-                    backdropFilter: 'blur(4px)',
-                  }}
-                >
-                  ⏸️
-                </button>
-              </div>
-            </>
-          )}
-
           {/* Pause Menu */}
-          {isPaused && !showShop && (
+          {isPaused && !showShop && !showJoystickSettings && (
             <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
                  style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
               <div className="card p-6 w-full max-w-[300px] bounce-in">
@@ -593,6 +602,9 @@ export default function GameCanvas() {
                   <button onClick={() => setShowShop(true)} className="w-full py-3 font-bold rounded-xl btn-warning text-gray-900">
                     🛒 SHOP (${displayState.totalFunding})
                   </button>
+                  <button onClick={() => setShowJoystickSettings(true)} className="w-full py-3 font-bold rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors">
+                    🎮 CONTROLS
+                  </button>
                   <button
                     onClick={() => { setIsPaused(false); handleMenu(); }}
                     className="w-full py-3 font-bold rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
@@ -600,6 +612,120 @@ export default function GameCanvas() {
                     ← MAIN MENU
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Joystick Settings */}
+          {isPaused && showJoystickSettings && (
+            <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
+                 style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
+              <div className="card p-6 w-full max-w-[340px] bounce-in">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-black text-gray-800">CONTROLS</h2>
+                  <span className="text-gray-500 text-sm">Mobile Only</span>
+                </div>
+
+                <div className="space-y-4 mb-4">
+                  {/* Joystick Side Toggle */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">Joystick Side</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveJoystickSettings({ ...joystickSettings, side: 'left' })}
+                        className={`flex-1 py-2 rounded-lg font-bold transition-all ${
+                          joystickSettings.side === 'left'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        }`}
+                      >
+                        ← Left
+                      </button>
+                      <button
+                        onClick={() => saveJoystickSettings({ ...joystickSettings, side: 'right' })}
+                        className={`flex-1 py-2 rounded-lg font-bold transition-all ${
+                          joystickSettings.side === 'right'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                        }`}
+                      >
+                        Right →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Joystick Size Slider */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Size: {joystickSettings.size}px
+                    </label>
+                    <input
+                      type="range"
+                      min="64"
+                      max="140"
+                      value={joystickSettings.size}
+                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, size: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  {/* Joystick Opacity Slider */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Opacity: {Math.round(joystickSettings.opacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      value={joystickSettings.opacity * 100}
+                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, opacity: parseInt(e.target.value) / 100 })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  {/* Position from Edge */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Distance from Edge: {joystickSettings.offsetX}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="60"
+                      value={joystickSettings.offsetX}
+                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, offsetX: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  {/* Position from Bottom */}
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      Distance from Bottom: {joystickSettings.offsetY}px
+                    </label>
+                    <input
+                      type="range"
+                      min="8"
+                      max="80"
+                      value={joystickSettings.offsetY}
+                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, offsetY: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+
+                  {/* Reset to defaults */}
+                  <button
+                    onClick={() => saveJoystickSettings({ side: 'right', size: 96, opacity: 0.5, offsetX: 16, offsetY: 16 })}
+                    className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors underline"
+                  >
+                    Reset to Defaults
+                  </button>
+                </div>
+
+                <button onClick={() => setShowJoystickSettings(false)} className="w-full py-3 font-bold rounded-xl btn-primary text-white">
+                  ← BACK
+                </button>
               </div>
             </div>
           )}
@@ -678,6 +804,53 @@ export default function GameCanvas() {
             </div>
           )}
         </>
+      )}
+
+      {/* === MOBILE PORTRAIT ROTATE MESSAGE === */}
+      {isMobilePortrait && displayState.phase !== 'menu' && (
+        <div className="absolute inset-0 flex items-center justify-center p-8 z-50"
+             style={{ background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' }}>
+          <div className="text-center">
+            <div className="text-6xl mb-4">📱</div>
+            <h2 className="text-white text-2xl font-bold mb-2">Rotate Your Device</h2>
+            <p className="text-white/60">Please rotate to landscape mode to play</p>
+            <div className="mt-6 text-4xl animate-pulse">↻</div>
+          </div>
+        </div>
+      )}
+
+      {/* === MOBILE LANDSCAPE JOYSTICK === */}
+      {isMobileLandscape && displayState.phase === 'playing' && !isPaused && (
+        <div
+          ref={joystickRef}
+          className="absolute z-40 rounded-full"
+          style={{
+            width: joystickSettings.size,
+            height: joystickSettings.size,
+            [joystickSettings.side]: joystickSettings.offsetX,
+            bottom: `calc(80px + ${joystickSettings.offsetY}px)`,
+            background: `rgba(255, 255, 255, ${joystickSettings.opacity * 0.3})`,
+            border: `3px solid rgba(255, 255, 255, ${joystickSettings.opacity})`,
+            touchAction: 'none',
+          }}
+          onTouchStart={handleVirtualJoystickStart}
+          onTouchMove={handleVirtualJoystickMove}
+          onTouchEnd={handleVirtualJoystickEnd}
+        >
+          {/* Inner knob */}
+          <div
+            className="absolute rounded-full"
+            style={{
+              width: joystickSettings.size * 0.4,
+              height: joystickSettings.size * 0.4,
+              background: `rgba(255, 255, 255, ${joystickSettings.opacity})`,
+              left: '50%',
+              top: '50%',
+              transform: `translate(calc(-50% + ${joystickPos.x}px), calc(-50% + ${joystickPos.y}px))`,
+              transition: joystickActive ? 'none' : 'transform 0.1s ease-out',
+            }}
+          />
+        </div>
       )}
 
       {/* === END SCREEN === */}
