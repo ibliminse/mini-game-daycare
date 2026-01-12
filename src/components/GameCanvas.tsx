@@ -697,8 +697,10 @@ export default function GameCanvas() {
 
       {/* === MENU === */}
       {displayState.phase === 'menu' && (
-        <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4"
+        <div className="absolute inset-0 overflow-y-auto p-4"
              style={{ background: '#B8D4E8' }}>
+          {/* Centering wrapper that allows scroll */}
+          <div className="min-h-full flex items-center justify-center py-4">
           {/* Clipboard */}
           <div className="relative w-full max-w-[420px] fade-in">
             {/* Realistic Pushpins */}
@@ -947,6 +949,7 @@ export default function GameCanvas() {
                 Reset Progress
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
