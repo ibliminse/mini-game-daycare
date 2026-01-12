@@ -30,6 +30,15 @@ import {
   claimChallengeReward,
   getTimeUntilReset,
 } from '@/game/dailyChallenges';
+import {
+  StoryScreen,
+  INTRO_STORY,
+  ENDINGS,
+  getLevelStory,
+  calculateEndingScore,
+  getEnding,
+  FinalStats,
+} from '@/game/story';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -70,6 +79,20 @@ export default function GameCanvas() {
   const [showDailyChallengesModal, setShowDailyChallengesModal] = useState<boolean>(false);
   const [challengeStatuses, setChallengeStatuses] = useState<ChallengeStatus[]>([]);
 
+  // Story mode state
+  const [showStory, setShowStory] = useState<boolean>(false);
+  const [storyScreens, setStoryScreens] = useState<StoryScreen[]>([]);
+  const [currentStoryIndex, setCurrentStoryIndex] = useState<number>(0);
+  const [storyType, setStoryType] = useState<'intro' | 'level' | 'ending'>('intro');
+  const [hasSeenIntro, setHasSeenIntro] = useState<boolean>(false);
+  // Track cumulative stats across all levels for ending calculation
+  const [cumulativeStats, setCumulativeStats] = useState<{
+    totalFunding: number;
+    totalEnrollments: number;
+    totalTimeRemaining: number;
+    levelsCompleted: number;
+  }>({ totalFunding: 0, totalEnrollments: 0, totalTimeRemaining: 0, levelsCompleted: 0 });
+
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
   const sfx = useSoundEffects(isMuted);
@@ -95,6 +118,8 @@ export default function GameCanvas() {
           const validLevel = Math.max(0, Math.min(progress.level, LEVEL_SPECS.length - 1));
           setCurrentLevel(validLevel);
         }
+        if (progress.hasSeenIntro) setHasSeenIntro(true);
+        if (progress.cumulativeStats) setCumulativeStats(progress.cumulativeStats);
       }
     } catch { /* ignore */ }
     setIsProgressLoaded(true);
@@ -107,9 +132,11 @@ export default function GameCanvas() {
         upgrades: persistentUpgrades,
         funding: persistentFunding,
         level: currentLevel,
+        hasSeenIntro,
+        cumulativeStats,
       }));
     } catch { /* ignore */ }
-  }, [persistentUpgrades, persistentFunding, currentLevel, isProgressLoaded]);
+  }, [persistentUpgrades, persistentFunding, currentLevel, isProgressLoaded, hasSeenIntro, cumulativeStats]);
 
   // Switch music based on game phase
   useEffect(() => {
@@ -212,6 +239,14 @@ export default function GameCanvas() {
       );
       setNewlyCompletedChallenges(newlyCompleted);
       setChallengeStatuses(getChallengeStatuses());
+
+      // Update cumulative stats for story ending
+      setCumulativeStats(prev => ({
+        totalFunding: prev.totalFunding + curr.funding,
+        totalEnrollments: prev.totalEnrollments + curr.enrollments,
+        totalTimeRemaining: prev.totalTimeRemaining + curr.timeRemaining,
+        levelsCompleted: prev.levelsCompleted + 1,
+      }));
     }
     if (curr.phase === 'lose' && prev.phase === 'playing') {
       sfx.playLose();
@@ -254,8 +289,8 @@ export default function GameCanvas() {
     }
   }, [displayState, sfx, vfx]);
 
-  const handleStart = useCallback(() => {
-    sfx.playClick();
+  // Actually start the game (called after story screens)
+  const startGame = useCallback(() => {
     resetIceTimer();
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding, difficulty);
     gameStateRef.current.phase = 'playing';
@@ -280,7 +315,94 @@ export default function GameCanvas() {
       if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
       tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
     }
-  }, [currentLevel, persistentUpgrades, persistentFunding, difficulty, sfx]);
+  }, [currentLevel, persistentUpgrades, persistentFunding, difficulty]);
+
+  const handleStart = useCallback(() => {
+    sfx.playClick();
+
+    // Determine which story to show
+    if (!hasSeenIntro) {
+      // First time playing - show intro story
+      setStoryScreens(INTRO_STORY);
+      setCurrentStoryIndex(0);
+      setStoryType('intro');
+      setShowStory(true);
+    } else {
+      // Show level story if available
+      const levelStory = getLevelStory(currentLevel);
+      if (levelStory) {
+        setStoryScreens(levelStory);
+        setCurrentStoryIndex(0);
+        setStoryType('level');
+        setShowStory(true);
+      } else {
+        // No story for this level, start directly
+        startGame();
+      }
+    }
+  }, [currentLevel, hasSeenIntro, sfx, startGame]);
+
+  // Advance to next story screen or start game
+  const handleStoryAdvance = useCallback(() => {
+    sfx.playClick();
+    if (currentStoryIndex < storyScreens.length - 1) {
+      // More screens to show
+      setCurrentStoryIndex(prev => prev + 1);
+    } else {
+      // Done with story screens
+      setShowStory(false);
+      if (storyType === 'intro') {
+        // After intro, mark as seen and show level story
+        setHasSeenIntro(true);
+        const levelStory = getLevelStory(currentLevel);
+        if (levelStory) {
+          setStoryScreens(levelStory);
+          setCurrentStoryIndex(0);
+          setStoryType('level');
+          setShowStory(true);
+        } else {
+          startGame();
+        }
+      } else if (storyType === 'ending') {
+        // After ending, go back to menu and reset for new game
+        setCumulativeStats({ totalFunding: 0, totalEnrollments: 0, totalTimeRemaining: 0, levelsCompleted: 0 });
+        setCurrentLevel(0);
+        handleMenu();
+      } else {
+        // After level story, start the game
+        startGame();
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStoryIndex, storyScreens.length, storyType, currentLevel, sfx, startGame]);
+
+  // Handle menu (need to declare before using in handleStoryAdvance)
+  const handleMenu = useCallback(() => {
+    setPersistentFunding(gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding, difficulty);
+    gameStateRef.current.phase = 'menu';
+    setDisplayState({ ...gameStateRef.current });
+  }, [persistentUpgrades, currentLevel, difficulty]);
+
+  // Show ending based on cumulative performance
+  const handleShowEnding = useCallback(() => {
+    sfx.playClick();
+    // Calculate ending score from cumulative stats
+    const finalStats: FinalStats = {
+      totalFunding: cumulativeStats.totalFunding + displayState.funding, // Include current level
+      totalEnrollments: cumulativeStats.totalEnrollments + displayState.enrollments,
+      averageTimeRemaining: (cumulativeStats.totalTimeRemaining + displayState.timeRemaining) / (cumulativeStats.levelsCompleted + 1),
+      difficulty: displayState.difficulty,
+      levelsCompleted: cumulativeStats.levelsCompleted + 1,
+    };
+    const endingScore = calculateEndingScore(finalStats);
+    const ending = getEnding(endingScore);
+
+    setStoryScreens(ending.screens);
+    setCurrentStoryIndex(0);
+    setStoryType('ending');
+    setShowStory(true);
+  }, [cumulativeStats, displayState, sfx]);
 
   const handleRestart = useCallback(() => {
     sfx.playClick();
@@ -297,29 +419,35 @@ export default function GameCanvas() {
   const handleNextLevel = useCallback(() => {
     sfx.playClick();
     const nextLevel = Math.min(gameStateRef.current.level + 1, LEVEL_SPECS.length - 1);
-    const currentDifficulty = gameStateRef.current.difficulty;
     setCurrentLevel(nextLevel);
-    resetIceTimer();
     setPersistentFunding(gameStateRef.current.totalFunding);
-    gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
-    gameStateRef.current.phase = 'playing';
-    prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
-    setDisplayState({ ...gameStateRef.current });
+
+    // Show level story if available
+    const levelStory = getLevelStory(nextLevel);
+    if (levelStory) {
+      setStoryScreens(levelStory);
+      setCurrentStoryIndex(0);
+      setStoryType('level');
+      setShowStory(true);
+    } else {
+      // No story, start directly
+      resetIceTimer();
+      const currentDifficulty = gameStateRef.current.difficulty;
+      gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
+      gameStateRef.current.phase = 'playing';
+      prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
+      setDisplayState({ ...gameStateRef.current });
+    }
   }, [persistentUpgrades, sfx]);
 
-  const handleMenu = useCallback(() => {
-    setPersistentFunding(gameStateRef.current.totalFunding);
-    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding, difficulty);
-    gameStateRef.current.phase = 'menu';
-    setDisplayState({ ...gameStateRef.current });
-  }, [persistentUpgrades, currentLevel, difficulty]);
-
   const handleResetProgress = useCallback(() => {
-    if (confirm('Reset all progress? This will erase your upgrades, funding, and level progress.')) {
+    if (confirm('Reset all progress? This will erase your upgrades, funding, level progress, and story progress.')) {
       localStorage.removeItem('qlearn_progress');
       setPersistentUpgrades({ carryCapacity: 0 });
       setPersistentFunding(0);
       setCurrentLevel(0);
+      setHasSeenIntro(false);
+      setCumulativeStats({ totalFunding: 0, totalEnrollments: 0, totalTimeRemaining: 0, levelsCompleted: 0 });
       gameStateRef.current = createInitialState(0, undefined, 0, difficulty);
       gameStateRef.current.phase = 'menu';
       setDisplayState({ ...gameStateRef.current });
@@ -1254,6 +1382,15 @@ export default function GameCanvas() {
                   NEXT →
                 </button>
               )}
+              {isWin && displayState.level >= LEVEL_SPECS.length - 1 && (
+                <button
+                  onClick={handleShowEnding}
+                  className={`flex-1 text-white font-bold rounded-xl ${isMobileLandscape ? 'py-2 text-sm' : 'py-3'}`}
+                  style={{ background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)' }}
+                >
+                  📖 ENDING
+                </button>
+              )}
             </div>
 
             <button onClick={handleMenu}
@@ -1433,6 +1570,112 @@ export default function GameCanvas() {
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* === STORY SCREEN === */}
+      {showStory && storyScreens.length > 0 && (
+        <div
+          className="absolute inset-0 flex items-center justify-center p-4 z-50 fade-in"
+          style={{ background: 'rgba(0,0,0,0.95)' }}
+          onClick={handleStoryAdvance}
+        >
+          <div className="w-full max-w-[500px] bounce-in">
+            {/* Newspaper style container */}
+            <div
+              className="rounded-lg overflow-hidden shadow-2xl"
+              style={{
+                background: storyType === 'ending' ? '#1a1a1a' : '#f5f0e8',
+                border: storyType === 'ending' ? '2px solid #444' : '3px solid #8b7355',
+              }}
+            >
+              {/* Newspaper header */}
+              <div
+                className="py-2 px-4 text-center border-b"
+                style={{
+                  background: storyType === 'ending' ? '#2a2a2a' : '#d4c4a8',
+                  borderColor: storyType === 'ending' ? '#444' : '#8b7355',
+                }}
+              >
+                <div
+                  className={`text-xs font-medium tracking-widest uppercase ${storyType === 'ending' ? 'text-gray-400' : 'text-gray-600'}`}
+                >
+                  {storyScreens[currentStoryIndex].source}
+                </div>
+              </div>
+
+              {/* Main content */}
+              <div className="p-6">
+                {/* Headline */}
+                <h1
+                  className={`text-2xl md:text-3xl font-black leading-tight mb-3 ${storyType === 'ending' ? 'text-white' : 'text-gray-900'}`}
+                  style={{ fontFamily: 'Georgia, serif' }}
+                >
+                  {storyScreens[currentStoryIndex].headline}
+                </h1>
+
+                {/* Subheadline */}
+                {storyScreens[currentStoryIndex].subheadline && (
+                  <p
+                    className={`text-base md:text-lg italic mb-4 ${storyType === 'ending' ? 'text-gray-300' : 'text-gray-700'}`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {storyScreens[currentStoryIndex].subheadline}
+                  </p>
+                )}
+
+                {/* Divider */}
+                <div
+                  className={`w-16 h-0.5 mb-4 ${storyType === 'ending' ? 'bg-gray-600' : 'bg-gray-400'}`}
+                />
+
+                {/* Details */}
+                {storyScreens[currentStoryIndex].details && (
+                  <p
+                    className={`text-sm md:text-base leading-relaxed ${storyType === 'ending' ? 'text-gray-400' : 'text-gray-600'}`}
+                    style={{ fontFamily: 'Georgia, serif' }}
+                  >
+                    {storyScreens[currentStoryIndex].details}
+                  </p>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div
+                className="py-3 px-4 flex justify-between items-center border-t"
+                style={{
+                  background: storyType === 'ending' ? '#2a2a2a' : '#e8dcc8',
+                  borderColor: storyType === 'ending' ? '#444' : '#8b7355',
+                }}
+              >
+                <div className={`text-xs ${storyType === 'ending' ? 'text-gray-500' : 'text-gray-500'}`}>
+                  {currentStoryIndex + 1} / {storyScreens.length}
+                </div>
+                <div
+                  className={`text-sm font-medium animate-pulse ${storyType === 'ending' ? 'text-gray-400' : 'text-gray-600'}`}
+                >
+                  Tap to continue...
+                </div>
+              </div>
+            </div>
+
+            {/* Story type indicator */}
+            {storyType === 'intro' && (
+              <div className="text-center mt-4 text-yellow-400 text-sm font-medium">
+                OPERATION NAPTIME - BRIEFING
+              </div>
+            )}
+            {storyType === 'level' && (
+              <div className="text-center mt-4 text-blue-400 text-sm font-medium">
+                LEVEL {currentLevel + 1} - {LEVEL_SPECS[currentLevel]?.name}
+              </div>
+            )}
+            {storyType === 'ending' && (
+              <div className="text-center mt-4 text-purple-400 text-sm font-medium">
+                THE END
+              </div>
+            )}
           </div>
         </div>
       )}
