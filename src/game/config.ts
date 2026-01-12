@@ -42,7 +42,40 @@ export const SPRINT_SPEED_MULTIPLIER = 1.5;
 export const NO_ICE_DURATION = 15; // seconds
 
 // Timer
-export const INSPECTION_TIME = 45; // 45 seconds per level
+export const INSPECTION_TIME = 45; // 45 seconds per level (Normal mode)
+
+// Difficulty settings
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+export const DIFFICULTY_SETTINGS: Record<Difficulty, {
+  label: string;
+  time: number;
+  iceSpeed: number;
+  iceSpawnInterval: number;
+  description: string;
+}> = {
+  easy: {
+    label: 'Easy',
+    time: 60,
+    iceSpeed: 80,
+    iceSpawnInterval: 30,
+    description: '60s, slow ICE',
+  },
+  normal: {
+    label: 'Normal',
+    time: 45,
+    iceSpeed: 120,
+    iceSpawnInterval: 20,
+    description: '45s, normal ICE',
+  },
+  hard: {
+    label: 'Hard',
+    time: 30,
+    iceSpeed: 160,
+    iceSpawnInterval: 15,
+    description: '30s, fast ICE',
+  },
+};
 
 // Somali Daycare Color Palette
 // Somali flag: Light blue (#4189DD) and white

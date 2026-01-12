@@ -1,5 +1,7 @@
 // Game entity types
 
+import { Difficulty } from './config';
+
 export interface Position {
   x: number;
   y: number;
@@ -126,6 +128,11 @@ export interface GameState {
     roomSearchProbability: number;
     searchDuration: number;
   };
+
+  // Difficulty settings
+  difficulty: Difficulty;
+  iceSpeed: number;                   // Speed adjusted by difficulty
+  iceSpawnInterval: number;           // Spawn interval adjusted by difficulty
 
   enrollments: number;
   funding: number;

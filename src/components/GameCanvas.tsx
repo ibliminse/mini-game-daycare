@@ -6,7 +6,7 @@ import { createInitialState, createInputState, createJoystickState } from '@/gam
 import { updateGame } from '@/game/update';
 import { render } from '@/game/render';
 import { setupKeyboardListeners } from '@/game/input';
-import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVEL_SPECS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION } from '@/game/config';
+import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVEL_SPECS, UPGRADE_COSTS, MAX_CARRY_CAPACITY, CARRY_CAPACITY, LOSE_THRESHOLD, SPRINT_DURATION, NO_ICE_DURATION, Difficulty, DIFFICULTY_SETTINGS } from '@/game/config';
 import { resetIceTimer } from '@/game/update';
 import { Upgrades } from '@/game/types';
 import { useAudio } from '@/hooks/useAudio';
@@ -15,7 +15,7 @@ import { useVisualEffects } from '@/hooks/useVisualEffects';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useRef<GameState>(createInitialState());
+  const gameStateRef = useRef<GameState>(createInitialState(0, undefined, 0, 'normal'));
   const inputStateRef = useRef<InputState>(createInputState());
   const joystickStateRef = useRef<JoystickState>(createJoystickState());
   const lastTimeRef = useRef<number>(0);
@@ -30,6 +30,7 @@ export default function GameCanvas() {
   const [persistentUpgrades, setPersistentUpgrades] = useState<Upgrades>({ carryCapacity: 0 });
   const [persistentFunding, setPersistentFunding] = useState<number>(0);
   const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
+  const [difficulty, setDifficulty] = useState<Difficulty>('normal');
 
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
@@ -160,7 +161,7 @@ export default function GameCanvas() {
   const handleStart = useCallback(() => {
     sfx.playClick();
     resetIceTimer();
-    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding, difficulty);
     gameStateRef.current.phase = 'playing';
     // Reset sound state tracking for new game
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
@@ -178,14 +179,15 @@ export default function GameCanvas() {
       if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
       tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
     }
-  }, [currentLevel, persistentUpgrades, persistentFunding, sfx]);
+  }, [currentLevel, persistentUpgrades, persistentFunding, difficulty, sfx]);
 
   const handleRestart = useCallback(() => {
     sfx.playClick();
     resetIceTimer();
     const currentLevel = gameStateRef.current.level;
+    const currentDifficulty = gameStateRef.current.difficulty;
     setPersistentFunding(gameStateRef.current.totalFunding);
-    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
     gameStateRef.current.phase = 'playing';
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
@@ -194,10 +196,11 @@ export default function GameCanvas() {
   const handleNextLevel = useCallback(() => {
     sfx.playClick();
     const nextLevel = Math.min(gameStateRef.current.level + 1, LEVEL_SPECS.length - 1);
+    const currentDifficulty = gameStateRef.current.difficulty;
     setCurrentLevel(nextLevel);
     resetIceTimer();
     setPersistentFunding(gameStateRef.current.totalFunding);
-    gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
     gameStateRef.current.phase = 'playing';
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
@@ -205,10 +208,10 @@ export default function GameCanvas() {
 
   const handleMenu = useCallback(() => {
     setPersistentFunding(gameStateRef.current.totalFunding);
-    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
+    gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding, difficulty);
     gameStateRef.current.phase = 'menu';
     setDisplayState({ ...gameStateRef.current });
-  }, [persistentUpgrades, currentLevel]);
+  }, [persistentUpgrades, currentLevel, difficulty]);
 
   const handleResetProgress = useCallback(() => {
     if (confirm('Reset all progress? This will erase your upgrades, funding, and level progress.')) {
@@ -216,11 +219,11 @@ export default function GameCanvas() {
       setPersistentUpgrades({ carryCapacity: 0 });
       setPersistentFunding(0);
       setCurrentLevel(0);
-      gameStateRef.current = createInitialState(0);
+      gameStateRef.current = createInitialState(0, undefined, 0, difficulty);
       gameStateRef.current.phase = 'menu';
       setDisplayState({ ...gameStateRef.current });
     }
-  }, []);
+  }, [difficulty]);
 
   const handleBuyCapacity = useCallback(() => {
     const currentCapacity = CARRY_CAPACITY + persistentUpgrades.carryCapacity;
@@ -236,7 +239,7 @@ export default function GameCanvas() {
     setPersistentFunding(newFunding);
 
     if (gameStateRef.current.phase === 'menu') {
-      gameStateRef.current = createInitialState(currentLevel, newUpgrades, newFunding);
+      gameStateRef.current = createInitialState(currentLevel, newUpgrades, newFunding, difficulty);
       gameStateRef.current.phase = 'menu';
       setDisplayState({ ...gameStateRef.current });
     } else if (gameStateRef.current.phase === 'playing') {
@@ -245,7 +248,7 @@ export default function GameCanvas() {
       gameStateRef.current.player.carryCapacity = CARRY_CAPACITY + newUpgrades.carryCapacity;
       setDisplayState({ ...gameStateRef.current });
     }
-  }, [persistentUpgrades, persistentFunding, currentLevel, sfx]);
+  }, [persistentUpgrades, persistentFunding, currentLevel, difficulty, sfx]);
 
   const handleBuySprint = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
@@ -581,6 +584,29 @@ export default function GameCanvas() {
                   <span>🏫</span> {LEVEL_SPECS[currentLevel]?.name || 'Unknown'}
                 </p>
                 <p className="text-white/70 text-sm">Level {currentLevel + 1} of {LEVEL_SPECS.length}</p>
+              </div>
+
+              {/* Difficulty Selector - Purple/Pink */}
+              <div className="rounded-xl p-3 mb-3" style={{ background: '#9B59B6' }}>
+                <p className="text-white font-bold text-sm mb-2 text-center">Difficulty</p>
+                <div className="flex gap-2">
+                  {(['easy', 'normal', 'hard'] as const).map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => { sfx.playClick(); setDifficulty(d); }}
+                      className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${
+                        difficulty === d
+                          ? 'bg-white text-purple-700 shadow-md'
+                          : 'bg-purple-400/50 text-white/80 hover:bg-purple-400/70'
+                      }`}
+                    >
+                      {DIFFICULTY_SETTINGS[d].label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-white/60 text-xs text-center mt-2">
+                  {DIFFICULTY_SETTINGS[difficulty].description}
+                </p>
               </div>
 
               {/* Upgrades Card - Teal/Green */}

@@ -11,6 +11,8 @@ import {
   COLORS,
   ICE_AGENT,
   INITIAL_SUSPICION,
+  Difficulty,
+  DIFFICULTY_SETTINGS,
 } from './config';
 
 /**
@@ -211,7 +213,7 @@ function spawnForms(building: Building): Form[] {
 /**
  * Create initial ICE agents (one per hallway, up to agentCount)
  */
-function createIceAgents(spec: LevelSpec): IceAgent[] {
+function createIceAgents(spec: LevelSpec, iceSpeed: number): IceAgent[] {
   const agents: IceAgent[] = [];
   const agentCount = Math.min(spec.iceConfig.agentCount, spec.hallways.length);
 
@@ -224,7 +226,7 @@ function createIceAgents(spec: LevelSpec): IceAgent[] {
       direction: 'right',
       active: false,
       timer: 0,
-      speed: spec.iceConfig.patrolSpeed || ICE_AGENT.speed,
+      speed: iceSpeed, // Use difficulty-based speed
       assignedHallwayId: hallway.id,
       state: 'patrolling',
     });
@@ -253,7 +255,7 @@ function createIceWarnings(spec: LevelSpec): IceWarning[] {
 /**
  * Create per-hallway spawn timers with staggered start times
  */
-function createHallwaySpawnTimers(spec: LevelSpec): HallwaySpawnTimer[] {
+function createHallwaySpawnTimers(spec: LevelSpec, spawnInterval: number): HallwaySpawnTimer[] {
   const timers: HallwaySpawnTimer[] = [];
   const agentCount = Math.min(spec.iceConfig.agentCount, spec.hallways.length);
 
@@ -264,7 +266,7 @@ function createHallwaySpawnTimers(spec: LevelSpec): HallwaySpawnTimer[] {
     timers.push({
       hallwayId: hallway.id,
       timeSinceSpawn: 0,
-      nextSpawnTime: ICE_AGENT.spawnInterval + staggerOffset + Math.random() * 5,
+      nextSpawnTime: spawnInterval + staggerOffset + Math.random() * 5,
     });
   }
 
@@ -297,15 +299,20 @@ function getDeskForSpec(spec: LevelSpec) {
  * @param levelIndex - which level to load (0-7)
  * @param persistedUpgrades - upgrades to carry over from previous games
  * @param persistedFunding - total funding accumulated
+ * @param difficulty - game difficulty (easy/normal/hard)
  */
 export function createInitialState(
   levelIndex: number = 0,
   persistedUpgrades?: Upgrades,
-  persistedFunding: number = 0
+  persistedFunding: number = 0,
+  difficulty: Difficulty = 'normal'
 ): GameState {
   // Clamp level index to valid range
   const validLevelIndex = Math.max(0, Math.min(levelIndex, LEVEL_SPECS.length - 1));
   const spec = LEVEL_SPECS[validLevelIndex];
+
+  // Get difficulty settings
+  const diffSettings = DIFFICULTY_SETTINGS[difficulty];
 
   const building = createBuildingFromSpec(spec);
   const forms = spawnForms(building);
@@ -332,9 +339,9 @@ export function createInitialState(
     desk: getDeskForSpec(spec),
 
     // Multi-ICE agent system
-    iceAgents: createIceAgents(spec),
+    iceAgents: createIceAgents(spec, diffSettings.iceSpeed),
     iceWarnings: createIceWarnings(spec),
-    hallwaySpawnTimers: createHallwaySpawnTimers(spec),
+    hallwaySpawnTimers: createHallwaySpawnTimers(spec, diffSettings.iceSpawnInterval),
 
     // Level ICE configuration
     iceConfig: {
@@ -343,11 +350,16 @@ export function createInitialState(
       searchDuration: spec.iceConfig.searchDuration,
     },
 
+    // Difficulty settings
+    difficulty,
+    iceSpeed: diffSettings.iceSpeed,
+    iceSpawnInterval: diffSettings.iceSpawnInterval,
+
     enrollments: 0,
     funding: 0,
     totalFunding: persistedFunding,
     suspicion: INITIAL_SUSPICION,
-    timeRemaining: INSPECTION_TIME,
+    timeRemaining: diffSettings.time,
     level: validLevelIndex,
     upgrades,
     sprintTimer: 0,
@@ -361,8 +373,10 @@ export function createInitialState(
 export function createInitialStateFromSpec(
   spec: LevelSpec,
   persistedUpgrades?: Upgrades,
-  persistedFunding: number = 0
+  persistedFunding: number = 0,
+  difficulty: Difficulty = 'normal'
 ): GameState {
+  const diffSettings = DIFFICULTY_SETTINGS[difficulty];
   const building = createBuildingFromSpec(spec);
   const forms = spawnForms(building);
   const upgrades = persistedUpgrades || createDefaultUpgrades();
@@ -388,9 +402,9 @@ export function createInitialStateFromSpec(
     desk: getDeskForSpec(spec),
 
     // Multi-ICE agent system
-    iceAgents: createIceAgents(spec),
+    iceAgents: createIceAgents(spec, diffSettings.iceSpeed),
     iceWarnings: createIceWarnings(spec),
-    hallwaySpawnTimers: createHallwaySpawnTimers(spec),
+    hallwaySpawnTimers: createHallwaySpawnTimers(spec, diffSettings.iceSpawnInterval),
 
     // Level ICE configuration
     iceConfig: {
@@ -399,11 +413,16 @@ export function createInitialStateFromSpec(
       searchDuration: spec.iceConfig.searchDuration,
     },
 
+    // Difficulty settings
+    difficulty,
+    iceSpeed: diffSettings.iceSpeed,
+    iceSpawnInterval: diffSettings.iceSpawnInterval,
+
     enrollments: 0,
     funding: 0,
     totalFunding: persistedFunding,
     suspicion: INITIAL_SUSPICION,
-    timeRemaining: INSPECTION_TIME,
+    timeRemaining: diffSettings.time,
     level: spec.difficulty - 1, // Convert 1-based difficulty to 0-based level index
     upgrades,
     sprintTimer: 0,
