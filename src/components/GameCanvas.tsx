@@ -31,6 +31,10 @@ export default function GameCanvas() {
   const [persistentFunding, setPersistentFunding] = useState<number>(0);
   const [isProgressLoaded, setIsProgressLoaded] = useState<boolean>(false);
 
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
+  const tutorialTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
   const sfx = useSoundEffects(isMuted);
@@ -158,6 +162,11 @@ export default function GameCanvas() {
     // Reset sound state tracking for new game
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
+
+    // Show tutorial for 8 seconds
+    setShowTutorial(true);
+    if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
+    tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
   }, [currentLevel, persistentUpgrades, persistentFunding, sfx]);
 
   const handleRestart = useCallback(() => {
@@ -722,6 +731,38 @@ export default function GameCanvas() {
               </div>
             )}
           </div>
+
+          {/* Tutorial Overlay */}
+          {showTutorial && !isPaused && (
+            <div
+              className="absolute inset-0 pointer-events-none flex items-center justify-center"
+              style={{ animation: 'fadeIn 0.3s ease-out' }}
+            >
+              <div className="glass-dark rounded-2xl p-4 max-w-xs text-center">
+                <div className="text-white font-bold text-lg mb-3">How to Play</div>
+                <div className="space-y-2 text-white/90 text-sm">
+                  {isMobileLandscape ? (
+                    <>
+                      <p>👆 Touch & drag anywhere to move</p>
+                      <p>📋 Collect forms from classrooms</p>
+                      <p>🏢 Drop forms at the Office desk</p>
+                      <p>🚨 Hide in rooms when ICE patrols!</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>⌨️ WASD or Arrow keys to move</p>
+                      <p>📋 Collect forms from classrooms</p>
+                      <p>🏢 Drop forms at the Office desk</p>
+                      <p>🚨 Hide in rooms when ICE patrols!</p>
+                    </>
+                  )}
+                </div>
+                <div className="mt-3 text-white/50 text-xs animate-pulse">
+                  Auto-hiding in a few seconds...
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Pause Menu */}
           {isPaused && !showShop && (
