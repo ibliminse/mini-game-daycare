@@ -11,6 +11,7 @@ import { resetIceTimer } from '@/game/update';
 import { Upgrades } from '@/game/types';
 import { useAudio } from '@/hooks/useAudio';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { useVisualEffects } from '@/hooks/useVisualEffects';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -33,6 +34,7 @@ export default function GameCanvas() {
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
   const sfx = useSoundEffects(isMuted);
+  const vfx = useVisualEffects();
 
   // Track previous state for sound effect triggers
   const prevStateRef = useRef({
@@ -81,27 +83,31 @@ export default function GameCanvas() {
     }
   }, [displayState.phase, playTrack]);
 
-  // Sound effects based on state changes
+  // Sound and visual effects based on state changes
   useEffect(() => {
     const prev = prevStateRef.current;
     const curr = displayState;
 
-    // Only trigger sounds during gameplay
+    // Only trigger effects during gameplay
     if (curr.phase === 'playing') {
       // Form collected
       if (curr.player.carrying > prev.carrying) {
         sfx.playCollect();
+        // Spawn paper particles at approximate center of screen
+        vfx.onCollectForm(window.innerWidth / 2, window.innerHeight / 2);
       }
 
       // Forms dropped off at desk
       if (curr.enrollments > prev.enrollments) {
         sfx.playDropOff();
+        vfx.onDropOff(window.innerWidth / 2, window.innerHeight / 2);
       }
 
       // ICE spawned
       const currIceCount = curr.iceAgents?.length || 0;
       if (currIceCount > prev.iceCount) {
         sfx.playIceAlert();
+        vfx.onIceSpawn();
       }
 
       // Suspicion level changes
@@ -111,8 +117,10 @@ export default function GameCanvas() {
       if (currSuspicionLevel > prev.suspicionLevel) {
         if (currSuspicionLevel === 2) {
           sfx.playSuspicionCritical();
+          vfx.onSuspicionCritical();
         } else if (currSuspicionLevel === 1) {
           sfx.playSuspicionWarning();
+          vfx.triggerFlash('yellow', 0.15, 200);
         }
       }
 
@@ -126,19 +134,21 @@ export default function GameCanvas() {
       };
     }
 
-    // Win/Lose sounds
+    // Win/Lose effects
     if (curr.phase === 'win' && prev.phase === 'playing') {
       sfx.playWin();
+      vfx.onWin(window.innerWidth / 2, window.innerHeight / 2);
     }
     if (curr.phase === 'lose' && prev.phase === 'playing') {
       sfx.playLose();
+      vfx.onLose();
     }
 
     // Update phase tracking
     if (curr.phase !== prev.phase) {
       prevStateRef.current.phase = curr.phase;
     }
-  }, [displayState, sfx]);
+  }, [displayState, sfx, vfx]);
 
   const handleStart = useCallback(() => {
     sfx.playClick();
@@ -223,11 +233,12 @@ export default function GameCanvas() {
     if (gameStateRef.current.sprintTimer > 0) return;
     sfx.playPurchase();
     sfx.playPowerUp();
+    vfx.onPowerUp();
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.sprint;
     gameStateRef.current.sprintTimer = SPRINT_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
-  }, [sfx]);
+  }, [sfx, vfx]);
 
   const handleBuyNoIce = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
@@ -235,11 +246,12 @@ export default function GameCanvas() {
     if (gameStateRef.current.noIceTimer > 0) return;
     sfx.playPurchase();
     sfx.playPowerUp();
+    vfx.onPowerUp();
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.noIce;
     gameStateRef.current.noIceTimer = NO_ICE_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
-  }, [sfx]);
+  }, [sfx, vfx]);
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickStateRef.current = { active: true, dx, dy };
@@ -380,7 +392,7 @@ export default function GameCanvas() {
 
   return (
     <div
-      className="fixed inset-0 overflow-hidden select-none"
+      className={`fixed inset-0 overflow-hidden select-none ${vfx.shake > 0 ? 'screen-shake' : ''}`}
       style={{
         background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
         paddingTop: 'env(safe-area-inset-top)',
@@ -1004,6 +1016,42 @@ export default function GameCanvas() {
               ← Menu
             </button>
           </div>
+        </div>
+      )}
+
+      {/* === VISUAL EFFECTS LAYER === */}
+      {/* Flash overlay */}
+      {vfx.flash && (
+        <div
+          className="fixed inset-0 pointer-events-none z-50"
+          style={{
+            backgroundColor: vfx.flash.color === 'red' ? '#ef4444'
+              : vfx.flash.color === 'green' ? '#22c55e'
+              : vfx.flash.color === 'yellow' ? '#f59e0b'
+              : '#ffffff',
+            opacity: vfx.flash.opacity,
+            transition: 'opacity 0.1s ease-out',
+          }}
+        />
+      )}
+
+      {/* Particles */}
+      {vfx.particles.length > 0 && (
+        <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+          {vfx.particles.map((particle) => (
+            <div
+              key={particle.id}
+              className={`particle ${particle.type === 'confetti' ? 'particle-confetti' : particle.type === 'sparkle' ? 'particle-sparkle' : 'particle'}`}
+              style={{
+                left: particle.x,
+                top: particle.y,
+                width: particle.size,
+                height: particle.size,
+                backgroundColor: particle.color,
+                transform: `translate(${particle.vx * 30}px, ${particle.vy * 30}px)`,
+              }}
+            />
+          ))}
         </div>
       )}
     </div>
