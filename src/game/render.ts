@@ -36,6 +36,11 @@ export function render(ctx: CanvasRenderingContext2D, state: GameState, time: nu
   // Draw desk
   drawDesk(ctx, state, time);
 
+  // Draw sprint trail effect
+  if (state.sprintTimer > 0) {
+    drawSprintTrail(ctx, state, time);
+  }
+
   // Draw player
   drawPlayer(ctx, state, time);
 
@@ -624,6 +629,70 @@ function drawFormStack(ctx: CanvasRenderingContext2D, state: GameState, time: nu
     ctx.stroke();
 
     ctx.restore();
+  }
+}
+
+/**
+ * Draw sprint trail effect - speed lines and afterimages when boosted
+ */
+function drawSprintTrail(ctx: CanvasRenderingContext2D, state: GameState, time: number): void {
+  const { player } = state;
+
+  // Draw speed lines behind player
+  const numLines = 5;
+  const lineLength = 25;
+
+  for (let i = 0; i < numLines; i++) {
+    const alpha = 0.3 - (i * 0.05);
+    const offset = i * 8;
+    const waveOffset = Math.sin(time / 50 + i) * 3;
+
+    // Yellow-gold speed lines
+    ctx.strokeStyle = `rgba(255, 215, 0, ${alpha})`;
+    ctx.lineWidth = 3 - (i * 0.4);
+    ctx.lineCap = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(player.x - offset - lineLength + waveOffset, player.y - 8 + (i * 4));
+    ctx.lineTo(player.x - offset + waveOffset, player.y - 8 + (i * 4));
+    ctx.stroke();
+  }
+
+  // Draw ghost afterimages
+  for (let i = 1; i <= 3; i++) {
+    const alpha = 0.15 - (i * 0.04);
+    const offset = i * 12;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(player.x - offset, player.y);
+
+    // Simple ghost silhouette
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, player.radius * 0.7, player.radius * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Head
+    ctx.beginPath();
+    ctx.arc(0, -6, player.radius * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // Add sparkle particles around player
+  for (let i = 0; i < 3; i++) {
+    const angle = (time / 100 + i * 2.1) % (Math.PI * 2);
+    const distance = 15 + Math.sin(time / 80 + i) * 5;
+    const sparkleX = player.x + Math.cos(angle) * distance;
+    const sparkleY = player.y + Math.sin(angle) * distance;
+    const sparkleSize = 2 + Math.sin(time / 50 + i * 1.5) * 1;
+
+    ctx.fillStyle = `rgba(255, 255, 100, ${0.6 + Math.sin(time / 30 + i) * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
