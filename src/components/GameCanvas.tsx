@@ -234,10 +234,10 @@ export default function GameCanvas() {
   // Joystick customization settings
   const [joystickSettings, setJoystickSettings] = useState({
     side: 'right' as 'left' | 'right',
-    size: 96, // pixels
-    opacity: 0.5,
-    offsetX: 16, // distance from edge
-    offsetY: 16, // distance from bottom
+    size: 100, // pixels
+    opacity: 0.6,
+    offsetX: 20, // distance from edge
+    offsetY: 24, // distance from bottom
   });
   const [showJoystickSettings, setShowJoystickSettings] = useState(false);
 
@@ -466,100 +466,115 @@ export default function GameCanvas() {
       {/* === HUD === */}
       {displayState.phase === 'playing' && (
         <>
-          {/* Top Bar */}
-          <div className="absolute top-0 left-0 right-0 p-2 slide-down"
+          {/* Unified Top HUD Bar */}
+          <div className="absolute top-0 left-0 right-0 slide-down"
                style={{
-                 paddingTop: 'max(8px, calc(env(safe-area-inset-top) + 4px))',
-                 paddingLeft: 'max(8px, env(safe-area-inset-left))',
-                 paddingRight: 'max(8px, env(safe-area-inset-right))',
+                 paddingTop: 'max(6px, calc(env(safe-area-inset-top) + 2px))',
+                 paddingLeft: 'max(6px, env(safe-area-inset-left))',
+                 paddingRight: 'max(6px, env(safe-area-inset-right))',
                }}>
-            <div className="flex justify-between items-center gap-1">
-              {/* Stats - more compact on mobile */}
-              <div className="flex gap-1 flex-wrap items-center">
-                <div className={`badge glass-dark text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}>
-                  {isMobileLandscape ? LEVEL_SPECS[displayState.level]?.name?.split(' ')[0] : LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
-                </div>
-                <div className={`badge text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
-                  ${displayState.totalFunding}
-                </div>
-                <div className={`badge glass-dark text-white ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}>
-                  📋 {displayState.player.carrying}/{displayState.player.carryCapacity}
-                </div>
-                {displayState.sprintTimer > 0 && (
-                  <div className={`badge animate-pulse ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
-                    ⚡ {Math.ceil(displayState.sprintTimer)}s
-                  </div>
-                )}
-                {displayState.noIceTimer > 0 && (
-                  <div className={`badge animate-pulse ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`} style={{ background: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)' }}>
-                    🛡️ {Math.ceil(displayState.noIceTimer)}s
-                  </div>
-                )}
-              </div>
-
-              {/* Timer & Controls */}
-              <div className="flex gap-1 items-center">
-                <button
-                  onClick={toggleMute}
-                  className={`badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}
-                  title={isMuted ? 'Unmute music' : 'Mute music'}
-                >
-                  {isMuted ? '🔇' : '🎵'}
-                </button>
+            {/* Single unified HUD container */}
+            <div className="flex items-center justify-center">
+              <div className={`glass-dark rounded-full flex items-center ${isMobileLandscape ? 'gap-1 px-2 py-1' : 'gap-2 px-3 py-1.5'}`}>
+                {/* Pause button */}
                 <button
                   onClick={() => setIsPaused(true)}
-                  className={`badge glass-dark text-white hover:bg-white/20 transition-colors cursor-pointer ${isMobileLandscape ? 'text-xs px-2 py-0.5' : ''}`}
+                  className={`text-white/80 hover:text-white transition-colors ${isMobileLandscape ? 'text-sm' : 'text-base'}`}
                 >
                   ⏸
                 </button>
-                <div className={`badge glass-dark text-white font-mono tabular-nums ${isMobileLandscape ? 'text-xs px-2 py-0.5' : 'text-base'}`}>
+
+                {/* Divider */}
+                <div className="w-px h-4 bg-white/20" />
+
+                {/* Timer */}
+                <div className={`text-white font-bold font-mono tabular-nums ${isMobileLandscape ? 'text-sm' : 'text-base'}`}>
                   {Math.ceil(displayState.timeRemaining)}s
                 </div>
-              </div>
-            </div>
-          </div>
 
-          {/* Suspicion Bar */}
-          <div className="absolute bottom-0 left-0 slide-up"
-               style={{
-                 paddingBottom: 'max(8px, calc(env(safe-area-inset-bottom) + 4px))',
-                 paddingLeft: 'max(8px, env(safe-area-inset-left))',
-                 // Leave room for joystick on right side on mobile
-                 right: isMobileLandscape ? '140px' : '0',
-                 paddingRight: isMobileLandscape ? '8px' : 'max(8px, env(safe-area-inset-right))',
-               }}>
-            <div className={`glass-dark rounded-xl ${isMobileLandscape ? 'p-2' : 'p-3'}`}>
-              <div className={`flex items-center ${isMobileLandscape ? 'gap-2' : 'gap-3'}`}>
-                <span className={`text-white/60 font-medium uppercase tracking-wider ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>
-                  {isMobileLandscape ? 'SUS' : 'Suspicion'}
-                </span>
-                <div className={`flex-1 bg-black/30 rounded-full overflow-hidden relative ${isMobileLandscape ? 'h-2' : 'h-3'}`}>
-                  <div
-                    className="absolute inset-y-0 left-0 transition-all duration-300 rounded-full"
-                    style={{
-                      width: `${suspicionPercent}%`,
-                      background: suspicionPercent > WARNING_THRESHOLD
-                        ? 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)'
-                        : suspicionPercent > LOSE_THRESHOLD
-                          ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
-                          : 'linear-gradient(90deg, #22c55e 0%, #16a34a 100%)',
-                    }}
-                  />
-                  <div className="absolute inset-y-0 w-0.5 bg-white/50" style={{ left: `${LOSE_THRESHOLD}%` }} />
+                {/* Divider */}
+                <div className="w-px h-4 bg-white/20" />
+
+                {/* Money */}
+                <div className={`text-green-400 font-bold ${isMobileLandscape ? 'text-sm' : 'text-base'}`}>
+                  ${displayState.totalFunding}
                 </div>
-                <span className={`font-bold tabular-nums ${isMobileLandscape ? 'text-xs' : 'text-sm'} ${
-                  suspicionPercent > WARNING_THRESHOLD ? 'text-red-400' :
-                  suspicionPercent > LOSE_THRESHOLD ? 'text-yellow-400' : 'text-green-400'
-                }`}>
-                  {Math.floor(displayState.suspicion)}%
+
+                {/* Divider */}
+                <div className="w-px h-4 bg-white/20" />
+
+                {/* Forms carried */}
+                <div className={`text-white ${isMobileLandscape ? 'text-sm' : 'text-base'}`}>
+                  📋{displayState.player.carrying}/{displayState.player.carryCapacity}
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-4 bg-white/20" />
+
+                {/* Suspicion - inline mini bar */}
+                <div className="flex items-center gap-1">
+                  <div className={`bg-black/40 rounded-full overflow-hidden relative ${isMobileLandscape ? 'w-12 h-2' : 'w-16 h-2.5'}`}>
+                    <div
+                      className="absolute inset-y-0 left-0 transition-all duration-300 rounded-full"
+                      style={{
+                        width: `${suspicionPercent}%`,
+                        background: suspicionPercent > WARNING_THRESHOLD
+                          ? '#ef4444'
+                          : suspicionPercent > LOSE_THRESHOLD
+                            ? '#f59e0b'
+                            : '#22c55e',
+                      }}
+                    />
+                    <div className="absolute inset-y-0 w-0.5 bg-white/40" style={{ left: `${LOSE_THRESHOLD}%` }} />
+                  </div>
+                  <span className={`font-bold tabular-nums ${isMobileLandscape ? 'text-xs' : 'text-sm'} ${
+                    suspicionPercent > WARNING_THRESHOLD ? 'text-red-400' :
+                    suspicionPercent > LOSE_THRESHOLD ? 'text-yellow-400' : 'text-green-400'
+                  }`}>
+                    {Math.floor(displayState.suspicion)}%
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-4 bg-white/20" />
+
+                {/* Mute button */}
+                <button
+                  onClick={toggleMute}
+                  className={`text-white/80 hover:text-white transition-colors ${isMobileLandscape ? 'text-sm' : 'text-base'}`}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? '🔇' : '🔊'}
+                </button>
+
+                {/* Active powerups */}
+                {displayState.sprintTimer > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-white/20" />
+                    <div className={`text-yellow-400 font-bold animate-pulse ${isMobileLandscape ? 'text-xs' : 'text-sm'}`}>
+                      ⚡{Math.ceil(displayState.sprintTimer)}
+                    </div>
+                  </>
+                )}
+                {displayState.noIceTimer > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-white/20" />
+                    <div className={`text-purple-400 font-bold animate-pulse ${isMobileLandscape ? 'text-xs' : 'text-sm'}`}>
+                      🛡️{Math.ceil(displayState.noIceTimer)}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Level name - small label below */}
+            {!isMobileLandscape && (
+              <div className="text-center mt-1">
+                <span className="text-white/40 text-xs">
+                  {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
                 </span>
               </div>
-              {!isMobileLandscape && (
-                <div className="text-white/40 text-[10px] text-center mt-1">
-                  Goal: ≤{LOSE_THRESHOLD}%
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Pause Menu */}
@@ -689,7 +704,7 @@ export default function GameCanvas() {
 
                   {/* Reset to defaults */}
                   <button
-                    onClick={() => saveJoystickSettings({ side: 'right', size: 96, opacity: 0.5, offsetX: 16, offsetY: 16 })}
+                    onClick={() => saveJoystickSettings({ side: 'right', size: 100, opacity: 0.6, offsetX: 20, offsetY: 24 })}
                     className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors underline"
                   >
                     Reset to Defaults
@@ -792,7 +807,7 @@ export default function GameCanvas() {
         </div>
       )}
 
-      {/* === MOBILE LANDSCAPE JOYSTICK (bottom right) === */}
+      {/* === MOBILE LANDSCAPE JOYSTICK === */}
       {isMobileLandscape && displayState.phase === 'playing' && !isPaused && (
         <div
           ref={joystickRef}
@@ -800,8 +815,11 @@ export default function GameCanvas() {
           style={{
             width: joystickSettings.size,
             height: joystickSettings.size,
-            right: `max(${joystickSettings.offsetX}px, env(safe-area-inset-right))`,
-            bottom: `calc(90px + ${joystickSettings.offsetY}px + env(safe-area-inset-bottom))`,
+            ...(joystickSettings.side === 'right'
+              ? { right: `max(${joystickSettings.offsetX}px, env(safe-area-inset-right))` }
+              : { left: `max(${joystickSettings.offsetX}px, env(safe-area-inset-left))` }
+            ),
+            bottom: `calc(${joystickSettings.offsetY}px + env(safe-area-inset-bottom))`,
             background: `rgba(255, 255, 255, ${joystickSettings.opacity * 0.3})`,
             border: `3px solid rgba(255, 255, 255, ${joystickSettings.opacity})`,
             touchAction: 'none',
