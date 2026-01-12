@@ -364,6 +364,12 @@ export function createInitialState(
     upgrades,
     sprintTimer: 0,
     noIceTimer: 0,
+
+    // Achievement tracking
+    iceEncounters: 0,
+    currentCombo: 0,
+    maxCombo: 0,
+    totalFormsCollected: 0,
   };
 }
 
@@ -427,6 +433,12 @@ export function createInitialStateFromSpec(
     upgrades,
     sprintTimer: 0,
     noIceTimer: 0,
+
+    // Achievement tracking
+    iceEncounters: 0,
+    currentCombo: 0,
+    maxCombo: 0,
+    totalFormsCollected: 0,
   };
 }
 

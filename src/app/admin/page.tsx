@@ -626,6 +626,10 @@ export default function AdminPage() {
         upgrades: { carryCapacity: 0 },
         sprintTimer: 0,
         noIceTimer: 0,
+        iceEncounters: 0,
+        currentCombo: 0,
+        maxCombo: 0,
+        totalFormsCollected: 0,
       };
     } else {
       const { createInitialState } = require('@/game/init');

@@ -420,6 +420,8 @@ function updateAllIceAgents(state: GameState, dt: number): boolean {
         if (warning.countdown <= 0) {
           warning.active = false;
           spawnIceAgentForHallway(agent, state);
+          // Track ICE spawn for achievements
+          state.iceEncounters++;
         }
       } else if (timer.timeSinceSpawn >= timer.nextSpawnTime) {
         // Start warning
@@ -530,6 +532,7 @@ export function updateGame(
       if (canPickupForm(newState.player, form)) {
         form.collected = true;
         newState.player.carrying++;
+        newState.totalFormsCollected++;
 
         if (newState.player.carrying >= newState.player.carryCapacity) {
           break;
@@ -541,12 +544,23 @@ export function updateGame(
   // Check desk drop-off (auto-drop)
   if (isPlayerAtDesk(newState.player, newState.desk) && newState.player.carrying > 0) {
     const formsDropped = newState.player.carrying;
-    const capacityBonus = formsDropped >= newState.player.carryCapacity ? CAPACITY_BONUS_REDUCTION : 0;
+    const isFullStack = formsDropped >= newState.player.carryCapacity;
+    const capacityBonus = isFullStack ? CAPACITY_BONUS_REDUCTION : 0;
 
     newState.enrollments += formsDropped * ENROLLMENT_PER_FORM;
     const earnedFunding = formsDropped * FUNDING_PER_FORM;
     newState.funding += earnedFunding;
     newState.totalFunding += earnedFunding;
+
+    // Track combo for achievements
+    if (isFullStack) {
+      newState.currentCombo++;
+      if (newState.currentCombo > newState.maxCombo) {
+        newState.maxCombo = newState.currentCombo;
+      }
+    } else {
+      newState.currentCombo = 0;
+    }
 
     // Reduce suspicion (forms make you look more legit!)
     const suspicionReduction = formsDropped * SUSPICION_REDUCTION_PER_FORM + capacityBonus;

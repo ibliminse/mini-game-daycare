@@ -143,6 +143,12 @@ export interface GameState {
   upgrades: Upgrades;
   sprintTimer: number;                // seconds remaining of sprint
   noIceTimer: number;                 // seconds remaining of no-ICE protection
+
+  // Achievement tracking
+  iceEncounters: number;              // Times player was spotted by ICE
+  currentCombo: number;               // Current streak of full-stack drops
+  maxCombo: number;                   // Best combo this game
+  totalFormsCollected: number;        // Total forms picked up this game
 }
 
 export interface InputState {

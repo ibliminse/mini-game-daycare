@@ -12,6 +12,16 @@ import { Upgrades } from '@/game/types';
 import { useAudio } from '@/hooks/useAudio';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { useVisualEffects } from '@/hooks/useVisualEffects';
+import {
+  Achievement,
+  GameEndStats,
+  checkAchievements,
+  getAchievementsWithStatus,
+  calculateScore,
+  isHighScore,
+  addToLeaderboard,
+  loadLeaderboard,
+} from '@/game/achievements';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +48,14 @@ export default function GameCanvas() {
 
   // Track if waiting for user to rotate device
   const [waitingForRotation, setWaitingForRotation] = useState<boolean>(false);
+
+  // Achievements and leaderboard state
+  const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
+  const [showHighScoreEntry, setShowHighScoreEntry] = useState<boolean>(false);
+  const [finalScore, setFinalScore] = useState<number>(0);
+  const [highScoreInitials, setHighScoreInitials] = useState<string>('');
+  const [showAchievementsModal, setShowAchievementsModal] = useState<boolean>(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
 
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
@@ -146,10 +164,51 @@ export default function GameCanvas() {
     if (curr.phase === 'win' && prev.phase === 'playing') {
       sfx.playWin();
       vfx.onWin(window.innerWidth / 2, window.innerHeight / 2);
+
+      // Check achievements and calculate score
+      const stats: GameEndStats = {
+        won: true,
+        timeRemaining: curr.timeRemaining,
+        totalTime: DIFFICULTY_SETTINGS[curr.difficulty].time,
+        enrollments: curr.enrollments,
+        funding: curr.totalFunding,
+        level: curr.level,
+        difficulty: curr.difficulty,
+        iceEncounters: curr.iceEncounters,
+        formsCollected: curr.totalFormsCollected,
+        maxCombo: curr.maxCombo,
+      };
+      const unlocked = checkAchievements(stats);
+      setNewAchievements(unlocked);
+
+      const score = calculateScore(stats);
+      setFinalScore(score);
+      if (isHighScore(score)) {
+        setShowHighScoreEntry(true);
+        setHighScoreInitials('');
+      }
     }
     if (curr.phase === 'lose' && prev.phase === 'playing') {
       sfx.playLose();
       vfx.onLose();
+
+      // Check achievements even on lose (some achievements don't require winning)
+      const stats: GameEndStats = {
+        won: false,
+        timeRemaining: curr.timeRemaining,
+        totalTime: DIFFICULTY_SETTINGS[curr.difficulty].time,
+        enrollments: curr.enrollments,
+        funding: curr.totalFunding,
+        level: curr.level,
+        difficulty: curr.difficulty,
+        iceEncounters: curr.iceEncounters,
+        formsCollected: curr.totalFormsCollected,
+        maxCombo: curr.maxCombo,
+      };
+      const unlocked = checkAchievements(stats);
+      setNewAchievements(unlocked);
+      setFinalScore(0);
+      setShowHighScoreEntry(false);
     }
 
     // Update phase tracking
@@ -165,6 +224,10 @@ export default function GameCanvas() {
     gameStateRef.current.phase = 'playing';
     // Reset sound state tracking for new game
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
+    // Reset achievements state
+    setNewAchievements([]);
+    setShowHighScoreEntry(false);
+    setFinalScore(0);
     setDisplayState({ ...gameStateRef.current });
 
     // If on mobile portrait, start paused and wait for rotation
@@ -275,6 +338,18 @@ export default function GameCanvas() {
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
   }, [sfx, vfx]);
+
+  const handleSubmitHighScore = useCallback(() => {
+    if (highScoreInitials.trim().length === 0) return;
+    sfx.playClick();
+    addToLeaderboard({
+      initials: highScoreInitials.toUpperCase().slice(0, 3),
+      score: finalScore,
+      level: displayState.level,
+      difficulty: displayState.difficulty,
+    });
+    setShowHighScoreEntry(false);
+  }, [highScoreInitials, finalScore, displayState.level, displayState.difficulty, sfx]);
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickStateRef.current = { active: true, dx, dy };
@@ -647,6 +722,24 @@ export default function GameCanvas() {
                 </button>
               </div>
 
+              {/* Achievements & Leaderboard Buttons */}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => { sfx.playClick(); setShowAchievementsModal(true); }}
+                  className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: '#9B59B6', color: 'white' }}
+                >
+                  🏆 Achievements
+                </button>
+                <button
+                  onClick={() => { sfx.playClick(); setShowLeaderboardModal(true); }}
+                  className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: '#E67E22', color: 'white' }}
+                >
+                  🎮 Leaderboard
+                </button>
+              </div>
+
               {/* Footer text */}
               <p className="text-white text-sm text-center mt-4 font-bold">
                 Get suspicion below {LOSE_THRESHOLD}% to pass inspection!
@@ -994,6 +1087,56 @@ export default function GameCanvas() {
               </p>
             )}
 
+            {/* Score (win only) */}
+            {isWin && finalScore > 0 && (
+              <div className={`text-center ${isMobileLandscape ? 'mb-2' : 'mb-3'}`}>
+                <div className={`font-black text-purple-600 ${isMobileLandscape ? 'text-2xl' : 'text-3xl'}`}>
+                  {finalScore.toLocaleString()} pts
+                </div>
+              </div>
+            )}
+
+            {/* New Achievements */}
+            {newAchievements.length > 0 && (
+              <div className={`rounded-xl p-2 mb-2 ${isMobileLandscape ? 'mb-1' : 'mb-3'}`}
+                   style={{ background: 'linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%)' }}>
+                <div className="text-white text-xs font-bold text-center mb-1">🏆 NEW ACHIEVEMENTS!</div>
+                <div className="flex flex-wrap justify-center gap-1">
+                  {newAchievements.map(a => (
+                    <span key={a.id} className="bg-white/20 rounded px-2 py-0.5 text-white text-xs">
+                      {a.icon} {a.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* High Score Entry */}
+            {showHighScoreEntry && isWin && (
+              <div className={`rounded-xl p-2 mb-2 ${isMobileLandscape ? 'mb-1' : 'mb-3'}`}
+                   style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' }}>
+                <div className="text-gray-900 text-xs font-bold text-center mb-1">🎮 NEW HIGH SCORE!</div>
+                <div className="flex gap-2 items-center justify-center">
+                  <input
+                    type="text"
+                    maxLength={3}
+                    placeholder="AAA"
+                    value={highScoreInitials}
+                    onChange={(e) => setHighScoreInitials(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
+                    className="w-16 text-center font-mono font-bold text-lg p-1 rounded bg-white/80 text-gray-900 uppercase"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSubmitHighScore}
+                    disabled={highScoreInitials.length === 0}
+                    className="px-3 py-1 bg-white rounded font-bold text-sm text-gray-900 disabled:opacity-50"
+                  >
+                    SAVE
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Stats */}
             <div className={`grid grid-cols-4 ${isMobileLandscape ? 'gap-1 mb-2' : 'grid-cols-2 gap-2 mb-4'}`}>
               <div className={`rounded-xl text-center text-white ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
@@ -1017,8 +1160,8 @@ export default function GameCanvas() {
               </div>
               <div className={`rounded-xl text-center text-white ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
                    style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
-                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
-                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Capacity</div>
+                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>{displayState.maxCombo > 0 ? `${displayState.maxCombo}x` : '-'}</div>
+                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Combo</div>
               </div>
             </div>
 
@@ -1038,6 +1181,104 @@ export default function GameCanvas() {
             <button onClick={handleMenu}
                     className={`w-full font-medium rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors ${isMobileLandscape ? 'py-1.5 text-sm' : 'py-2'}`}>
               ← Menu
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === ACHIEVEMENTS MODAL === */}
+      {showAchievementsModal && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 z-50 fade-in"
+             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+          <div className="card p-4 w-full max-w-[380px] max-h-[80vh] overflow-auto bounce-in">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-gray-800">🏆 Achievements</h2>
+              <button
+                onClick={() => setShowAchievementsModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-2">
+              {getAchievementsWithStatus().map(achievement => (
+                <div
+                  key={achievement.id}
+                  className={`p-3 rounded-lg ${achievement.unlocked ? 'bg-purple-100' : 'bg-gray-100 opacity-60'}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{achievement.icon}</span>
+                    <div>
+                      <div className={`font-bold ${achievement.unlocked ? 'text-purple-800' : 'text-gray-500'}`}>
+                        {achievement.name}
+                      </div>
+                      <div className="text-xs text-gray-600">{achievement.description}</div>
+                    </div>
+                    {achievement.unlocked && (
+                      <span className="ml-auto text-green-500">✓</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAchievementsModal(false)}
+              className="w-full mt-4 py-2 font-bold rounded-xl btn-primary text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === LEADERBOARD MODAL === */}
+      {showLeaderboardModal && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 z-50 fade-in"
+             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+          <div className="card p-4 w-full max-w-[380px] max-h-[80vh] overflow-auto bounce-in">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-gray-800">🎮 Leaderboard</h2>
+              <button
+                onClick={() => setShowLeaderboardModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-2">
+              {loadLeaderboard().length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  No high scores yet!<br/>
+                  <span className="text-sm">Win a level to get on the board</span>
+                </div>
+              ) : (
+                loadLeaderboard().map((entry, index) => (
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg flex items-center gap-3 ${
+                      index === 0 ? 'bg-yellow-100' :
+                      index === 1 ? 'bg-gray-200' :
+                      index === 2 ? 'bg-orange-100' : 'bg-gray-50'
+                    }`}
+                  >
+                    <span className={`font-black text-lg w-6 ${
+                      index === 0 ? 'text-yellow-600' :
+                      index === 1 ? 'text-gray-500' :
+                      index === 2 ? 'text-orange-600' : 'text-gray-400'
+                    }`}>
+                      {index + 1}
+                    </span>
+                    <span className="font-mono font-bold text-lg">{entry.initials}</span>
+                    <span className="font-black text-purple-600 ml-auto">{entry.score.toLocaleString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+            <button
+              onClick={() => setShowLeaderboardModal(false)}
+              className="w-full mt-4 py-2 font-bold rounded-xl btn-primary text-white"
+            >
+              Close
             </button>
           </div>
         </div>
