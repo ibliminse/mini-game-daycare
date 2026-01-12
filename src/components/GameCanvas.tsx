@@ -320,73 +320,55 @@ export default function GameCanvas() {
     };
   }, []);
 
-  // Virtual joystick state for mobile
-  const joystickRef = useRef<HTMLDivElement>(null);
+  // Floating joystick state for mobile
   const [joystickActive, setJoystickActive] = useState(false);
-  const [joystickPos, setJoystickPos] = useState({ x: 0, y: 0 });
+  const [joystickOrigin, setJoystickOrigin] = useState({ x: 0, y: 0 }); // Where touch started
+  const [joystickKnob, setJoystickKnob] = useState({ x: 0, y: 0 }); // Knob offset from origin
+  const joystickSize = 120; // Base size of joystick
+  const joystickMaxDistance = 50; // Max distance knob can move from center
 
-  // Joystick customization settings
-  const [joystickSettings, setJoystickSettings] = useState({
-    side: 'right' as 'left' | 'right',
-    size: 100, // pixels
-    opacity: 0.6,
-    offsetX: 20, // distance from edge
-    offsetY: 24, // distance from bottom
-  });
-  const [showJoystickSettings, setShowJoystickSettings] = useState(false);
+  // Handle touch start anywhere on game area - spawn floating joystick
+  const handleFloatingJoystickStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobileLandscape || displayState.phase !== 'playing' || isPaused) return;
 
-  // Load joystick settings from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('qlearn_joystick_settings');
-      if (saved) {
-        setJoystickSettings(prev => ({ ...prev, ...JSON.parse(saved) }));
-      }
-    } catch { /* ignore */ }
-  }, []);
+    const touch = e.touches[0];
+    // Only activate if touch is in bottom half of screen (avoid HUD)
+    if (touch.clientY < window.innerHeight * 0.3) return;
 
-  // Save joystick settings to localStorage
-  const saveJoystickSettings = useCallback((settings: typeof joystickSettings) => {
-    setJoystickSettings(settings);
-    try {
-      localStorage.setItem('qlearn_joystick_settings', JSON.stringify(settings));
-    } catch { /* ignore */ }
-  }, []);
-
-  const handleVirtualJoystickStart = useCallback((e: React.TouchEvent) => {
-    if (!joystickRef.current) return;
-    e.stopPropagation();
+    e.preventDefault();
     setJoystickActive(true);
-    const touch = e.touches[0];
-    const rect = joystickRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = (touch.clientX - centerX) / (rect.width / 2);
-    const dy = (touch.clientY - centerY) / (rect.height / 2);
-    const clampedX = Math.max(-1, Math.min(1, dx));
-    const clampedY = Math.max(-1, Math.min(1, dy));
-    setJoystickPos({ x: clampedX * 25, y: clampedY * 25 });
-    handleJoystickMove(clampedX, clampedY);
-  }, [handleJoystickMove]);
+    setJoystickOrigin({ x: touch.clientX, y: touch.clientY });
+    setJoystickKnob({ x: 0, y: 0 });
+  }, [isMobileLandscape, displayState.phase, isPaused]);
 
-  const handleVirtualJoystickMove = useCallback((e: React.TouchEvent) => {
-    if (!joystickActive || !joystickRef.current) return;
-    e.stopPropagation();
-    const touch = e.touches[0];
-    const rect = joystickRef.current.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const dx = (touch.clientX - centerX) / (rect.width / 2);
-    const dy = (touch.clientY - centerY) / (rect.height / 2);
-    const clampedX = Math.max(-1, Math.min(1, dx));
-    const clampedY = Math.max(-1, Math.min(1, dy));
-    setJoystickPos({ x: clampedX * 25, y: clampedY * 25 });
-    handleJoystickMove(clampedX, clampedY);
-  }, [joystickActive, handleJoystickMove]);
+  const handleFloatingJoystickMove = useCallback((e: React.TouchEvent) => {
+    if (!joystickActive) return;
 
-  const handleVirtualJoystickEnd = useCallback(() => {
+    e.preventDefault();
+    const touch = e.touches[0];
+
+    // Calculate offset from origin
+    let dx = touch.clientX - joystickOrigin.x;
+    let dy = touch.clientY - joystickOrigin.y;
+
+    // Calculate distance and clamp to max
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    if (distance > joystickMaxDistance) {
+      dx = (dx / distance) * joystickMaxDistance;
+      dy = (dy / distance) * joystickMaxDistance;
+    }
+
+    setJoystickKnob({ x: dx, y: dy });
+
+    // Normalize to -1 to 1 range for game input
+    const normalizedX = dx / joystickMaxDistance;
+    const normalizedY = dy / joystickMaxDistance;
+    handleJoystickMove(normalizedX, normalizedY);
+  }, [joystickActive, joystickOrigin, joystickMaxDistance, handleJoystickMove]);
+
+  const handleFloatingJoystickEnd = useCallback(() => {
     setJoystickActive(false);
-    setJoystickPos({ x: 0, y: 0 });
+    setJoystickKnob({ x: 0, y: 0 });
     handleJoystickEnd();
   }, [handleJoystickEnd]);
 
@@ -403,9 +385,16 @@ export default function GameCanvas() {
       role="application"
       aria-label="Q-Learn Daycare Simulator Game"
     >
-      {/* Game canvas */}
+      {/* Game canvas with touch area for floating joystick */}
       {displayState.phase !== 'menu' && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          onTouchStart={handleFloatingJoystickStart}
+          onTouchMove={handleFloatingJoystickMove}
+          onTouchEnd={handleFloatingJoystickEnd}
+          onTouchCancel={handleFloatingJoystickEnd}
+          style={{ touchAction: 'none' }}
+        >
           <canvas
             ref={canvasRef}
             width={MAP_WIDTH}
@@ -735,7 +724,7 @@ export default function GameCanvas() {
           </div>
 
           {/* Pause Menu */}
-          {isPaused && !showShop && !showJoystickSettings && (
+          {isPaused && !showShop && (
             <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
                  style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
               <div className="card p-6 w-full max-w-[300px] bounce-in">
@@ -747,9 +736,6 @@ export default function GameCanvas() {
                   <button onClick={() => setShowShop(true)} className="w-full py-3 font-bold rounded-xl btn-warning text-gray-900">
                     🛒 SHOP (${displayState.totalFunding})
                   </button>
-                  <button onClick={() => setShowJoystickSettings(true)} className="w-full py-3 font-bold rounded-xl bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-                    🎮 CONTROLS
-                  </button>
                   <button
                     onClick={() => { setIsPaused(false); handleMenu(); }}
                     className="w-full py-3 font-bold rounded-xl bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors"
@@ -757,120 +743,6 @@ export default function GameCanvas() {
                     ← MAIN MENU
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Joystick Settings */}
-          {isPaused && showJoystickSettings && (
-            <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
-                 style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)' }}>
-              <div className="card p-6 w-full max-w-[340px] bounce-in">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-xl font-black text-gray-800">CONTROLS</h2>
-                  <span className="text-gray-500 text-sm">Mobile Only</span>
-                </div>
-
-                <div className="space-y-4 mb-4">
-                  {/* Joystick Side Toggle */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">Joystick Side</label>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => saveJoystickSettings({ ...joystickSettings, side: 'left' })}
-                        className={`flex-1 py-2 rounded-lg font-bold transition-all ${
-                          joystickSettings.side === 'left'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                        }`}
-                      >
-                        ← Left
-                      </button>
-                      <button
-                        onClick={() => saveJoystickSettings({ ...joystickSettings, side: 'right' })}
-                        className={`flex-1 py-2 rounded-lg font-bold transition-all ${
-                          joystickSettings.side === 'right'
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                        }`}
-                      >
-                        Right →
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Joystick Size Slider */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Size: {joystickSettings.size}px
-                    </label>
-                    <input
-                      type="range"
-                      min="64"
-                      max="140"
-                      value={joystickSettings.size}
-                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, size: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  {/* Joystick Opacity Slider */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Opacity: {Math.round(joystickSettings.opacity * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="20"
-                      max="100"
-                      value={joystickSettings.opacity * 100}
-                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, opacity: parseInt(e.target.value) / 100 })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  {/* Position from Edge */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Distance from Edge: {joystickSettings.offsetX}px
-                    </label>
-                    <input
-                      type="range"
-                      min="8"
-                      max="60"
-                      value={joystickSettings.offsetX}
-                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, offsetX: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  {/* Position from Bottom */}
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                      Distance from Bottom: {joystickSettings.offsetY}px
-                    </label>
-                    <input
-                      type="range"
-                      min="8"
-                      max="80"
-                      value={joystickSettings.offsetY}
-                      onChange={(e) => saveJoystickSettings({ ...joystickSettings, offsetY: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                    />
-                  </div>
-
-                  {/* Reset to defaults */}
-                  <button
-                    onClick={() => saveJoystickSettings({ side: 'right', size: 100, opacity: 0.6, offsetX: 20, offsetY: 24 })}
-                    className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors underline"
-                  >
-                    Reset to Defaults
-                  </button>
-                </div>
-
-                <button onClick={() => setShowJoystickSettings(false)} className="w-full py-3 font-bold rounded-xl btn-primary text-white">
-                  ← BACK
-                </button>
               </div>
             </div>
           )}
@@ -964,38 +836,35 @@ export default function GameCanvas() {
         </div>
       )}
 
-      {/* === MOBILE LANDSCAPE JOYSTICK === */}
-      {isMobileLandscape && displayState.phase === 'playing' && !isPaused && (
+      {/* === FLOATING JOYSTICK (appears where you touch) === */}
+      {joystickActive && isMobileLandscape && displayState.phase === 'playing' && !isPaused && (
         <div
-          ref={joystickRef}
-          className="absolute z-40 rounded-full"
+          className="absolute z-40 pointer-events-none"
           style={{
-            width: joystickSettings.size,
-            height: joystickSettings.size,
-            ...(joystickSettings.side === 'right'
-              ? { right: `max(${joystickSettings.offsetX}px, env(safe-area-inset-right))` }
-              : { left: `max(${joystickSettings.offsetX}px, env(safe-area-inset-left))` }
-            ),
-            bottom: `calc(${joystickSettings.offsetY}px + env(safe-area-inset-bottom))`,
-            background: `rgba(255, 255, 255, ${joystickSettings.opacity * 0.3})`,
-            border: `3px solid rgba(255, 255, 255, ${joystickSettings.opacity})`,
-            touchAction: 'none',
+            left: joystickOrigin.x - joystickSize / 2,
+            top: joystickOrigin.y - joystickSize / 2,
+            width: joystickSize,
+            height: joystickSize,
           }}
-          onTouchStart={handleVirtualJoystickStart}
-          onTouchMove={handleVirtualJoystickMove}
-          onTouchEnd={handleVirtualJoystickEnd}
         >
+          {/* Outer ring */}
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: 'rgba(255, 255, 255, 0.15)',
+              border: '3px solid rgba(255, 255, 255, 0.4)',
+            }}
+          />
           {/* Inner knob */}
           <div
             className="absolute rounded-full"
             style={{
-              width: joystickSettings.size * 0.4,
-              height: joystickSettings.size * 0.4,
-              background: `rgba(255, 255, 255, ${joystickSettings.opacity})`,
+              width: joystickSize * 0.4,
+              height: joystickSize * 0.4,
+              background: 'rgba(255, 255, 255, 0.7)',
               left: '50%',
               top: '50%',
-              transform: `translate(calc(-50% + ${joystickPos.x}px), calc(-50% + ${joystickPos.y}px))`,
-              transition: joystickActive ? 'none' : 'transform 0.1s ease-out',
+              transform: `translate(calc(-50% + ${joystickKnob.x}px), calc(-50% + ${joystickKnob.y}px))`,
             }}
           />
         </div>
