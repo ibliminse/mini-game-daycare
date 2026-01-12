@@ -319,28 +319,13 @@ export default function GameCanvas() {
 
   const handleStart = useCallback(() => {
     sfx.playClick();
-
-    // Determine which story to show
+    // Start game directly (no story screens at beginning)
+    startGame();
+    // Mark intro as seen for ending tracking purposes
     if (!hasSeenIntro) {
-      // First time playing - show intro story
-      setStoryScreens(INTRO_STORY);
-      setCurrentStoryIndex(0);
-      setStoryType('intro');
-      setShowStory(true);
-    } else {
-      // Show level story if available
-      const levelStory = getLevelStory(currentLevel);
-      if (levelStory) {
-        setStoryScreens(levelStory);
-        setCurrentStoryIndex(0);
-        setStoryType('level');
-        setShowStory(true);
-      } else {
-        // No story for this level, start directly
-        startGame();
-      }
+      setHasSeenIntro(true);
     }
-  }, [currentLevel, hasSeenIntro, sfx, startGame]);
+  }, [hasSeenIntro, sfx, startGame]);
 
   // Advance to next story screen or start game
   const handleStoryAdvance = useCallback(() => {
@@ -422,22 +407,13 @@ export default function GameCanvas() {
     setCurrentLevel(nextLevel);
     setPersistentFunding(gameStateRef.current.totalFunding);
 
-    // Show level story if available
-    const levelStory = getLevelStory(nextLevel);
-    if (levelStory) {
-      setStoryScreens(levelStory);
-      setCurrentStoryIndex(0);
-      setStoryType('level');
-      setShowStory(true);
-    } else {
-      // No story, start directly
-      resetIceTimer();
-      const currentDifficulty = gameStateRef.current.difficulty;
-      gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
-      gameStateRef.current.phase = 'playing';
-      prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
-      setDisplayState({ ...gameStateRef.current });
-    }
+    // Start next level directly (no story screens)
+    resetIceTimer();
+    const currentDifficulty = gameStateRef.current.difficulty;
+    gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding, currentDifficulty);
+    gameStateRef.current.phase = 'playing';
+    prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
+    setDisplayState({ ...gameStateRef.current });
   }, [persistentUpgrades, sfx]);
 
   const handleResetProgress = useCallback(() => {
@@ -542,6 +518,22 @@ export default function GameCanvas() {
     return () => { clearInterval(interval); cleanup(); };
   }, []);
 
+  // Dismiss tutorial on any key press (desktop)
+  useEffect(() => {
+    if (!showTutorial) return;
+
+    const handleKeyDown = () => {
+      setShowTutorial(false);
+      if (tutorialTimerRef.current) {
+        clearTimeout(tutorialTimerRef.current);
+        tutorialTimerRef.current = null;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showTutorial]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -553,7 +545,8 @@ export default function GameCanvas() {
       lastTimeRef.current = timestamp;
       gameTimeRef.current += deltaTime;
 
-      if (gameStateRef.current.phase === 'playing' && !isPaused) {
+      // Pause game during tutorial (timer doesn't run)
+      if (gameStateRef.current.phase === 'playing' && !isPaused && !showTutorial) {
         gameStateRef.current = updateGame(gameStateRef.current, inputStateRef.current, joystickStateRef.current, deltaTime);
       }
       render(ctx, gameStateRef.current, gameTimeRef.current);
@@ -563,7 +556,7 @@ export default function GameCanvas() {
 
     animationFrameRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(animationFrameRef.current);
-  }, [isPaused, displayState.phase]);
+  }, [isPaused, displayState.phase, showTutorial]);
 
   const isWin = displayState.phase === 'win';
   const isLose = displayState.phase === 'lose';
@@ -616,6 +609,15 @@ export default function GameCanvas() {
   const handleFloatingJoystickStart = useCallback((e: React.TouchEvent) => {
     if (!isMobileLandscape || displayState.phase !== 'playing' || isPaused) return;
 
+    // Dismiss tutorial on first touch
+    if (showTutorial) {
+      setShowTutorial(false);
+      if (tutorialTimerRef.current) {
+        clearTimeout(tutorialTimerRef.current);
+        tutorialTimerRef.current = null;
+      }
+    }
+
     const touch = e.touches[0];
     // Only activate if touch is in bottom half of screen (avoid HUD)
     if (touch.clientY < window.innerHeight * 0.3) return;
@@ -624,7 +626,7 @@ export default function GameCanvas() {
     setJoystickActive(true);
     setJoystickOrigin({ x: touch.clientX, y: touch.clientY });
     setJoystickKnob({ x: 0, y: 0 });
-  }, [isMobileLandscape, displayState.phase, isPaused]);
+  }, [isMobileLandscape, displayState.phase, isPaused, showTutorial]);
 
   const handleFloatingJoystickMove = useCallback((e: React.TouchEvent) => {
     if (!joystickActive) return;
