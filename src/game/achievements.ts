@@ -27,7 +27,7 @@ export interface UnlockedAchievement {
 }
 
 export interface LeaderboardEntry {
-  initials: string;
+  name: string;
   score: number;
   level: number;
   difficulty: string;

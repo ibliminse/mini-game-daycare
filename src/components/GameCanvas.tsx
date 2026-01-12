@@ -70,7 +70,7 @@ export default function GameCanvas() {
   const [newAchievements, setNewAchievements] = useState<Achievement[]>([]);
   const [showHighScoreEntry, setShowHighScoreEntry] = useState<boolean>(false);
   const [finalScore, setFinalScore] = useState<number>(0);
-  const [highScoreInitials, setHighScoreInitials] = useState<string>('');
+  const [highScoreName, setHighScoreName] = useState<string>('');
   const [showAchievementsModal, setShowAchievementsModal] = useState<boolean>(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
 
@@ -225,7 +225,7 @@ export default function GameCanvas() {
       setFinalScore(score);
       if (isHighScore(score)) {
         setShowHighScoreEntry(true);
-        setHighScoreInitials('');
+        setHighScoreName('');
       }
 
       // Update daily challenges
@@ -482,16 +482,16 @@ export default function GameCanvas() {
   }, [sfx, vfx]);
 
   const handleSubmitHighScore = useCallback(() => {
-    if (highScoreInitials.trim().length === 0) return;
+    if (highScoreName.trim().length === 0) return;
     sfx.playClick();
     addToLeaderboard({
-      initials: highScoreInitials.toUpperCase().slice(0, 3),
+      name: highScoreName.trim().slice(0, 8),
       score: finalScore,
       level: displayState.level,
       difficulty: displayState.difficulty,
     });
     setShowHighScoreEntry(false);
-  }, [highScoreInitials, finalScore, displayState.level, displayState.difficulty, sfx]);
+  }, [highScoreName, finalScore, displayState.level, displayState.difficulty, sfx]);
 
   const handleClaimChallengeReward = useCallback((challengeId: string) => {
     const reward = claimChallengeReward(challengeId);
@@ -1330,16 +1330,16 @@ export default function GameCanvas() {
                 <div className="flex gap-2 items-center justify-center">
                   <input
                     type="text"
-                    maxLength={3}
-                    placeholder="AAA"
-                    value={highScoreInitials}
-                    onChange={(e) => setHighScoreInitials(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))}
-                    className="w-16 text-center font-mono font-bold text-lg p-1 rounded bg-white/80 text-gray-900 uppercase"
+                    maxLength={8}
+                    placeholder="Name"
+                    value={highScoreName}
+                    onChange={(e) => setHighScoreName(e.target.value)}
+                    className="w-24 text-center font-bold text-base p-1 rounded bg-white/80 text-gray-900"
                     autoFocus
                   />
                   <button
                     onClick={handleSubmitHighScore}
-                    disabled={highScoreInitials.length === 0}
+                    disabled={highScoreName.trim().length === 0}
                     className="px-3 py-1 bg-white rounded font-bold text-sm text-gray-900 disabled:opacity-50"
                   >
                     SAVE
@@ -1488,7 +1488,7 @@ export default function GameCanvas() {
                     }`}>
                       {index + 1}
                     </span>
-                    <span className="font-mono font-bold text-lg">{entry.initials}</span>
+                    <span className="font-bold text-base truncate max-w-[100px]">{entry.name}</span>
                     <span className="font-black text-purple-600 ml-auto">{entry.score.toLocaleString()}</span>
                   </div>
                 ))
