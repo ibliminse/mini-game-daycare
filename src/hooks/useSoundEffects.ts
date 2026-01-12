@@ -4,6 +4,17 @@ import { useRef, useCallback, useEffect } from 'react';
 
 type OscillatorType = 'sine' | 'square' | 'sawtooth' | 'triangle';
 
+// Haptic feedback utility - vibrates on supported devices
+const vibrate = (pattern: number | number[]) => {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    try {
+      navigator.vibrate(pattern);
+    } catch {
+      // Vibration not supported or failed
+    }
+  }
+};
+
 export function useSoundEffects(isMuted: boolean) {
   const audioContextRef = useRef<AudioContext | null>(null);
 
@@ -86,6 +97,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Collect form - quick paper shuffle sound
   const playCollect = useCallback(() => {
+    vibrate(15); // Light tap
     if (isMuted) return;
     const ctx = getContext();
 
@@ -118,6 +130,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Drop off forms - cash register / cha-ching
   const playDropOff = useCallback(() => {
+    vibrate([20, 40, 30]); // Double tap - success feeling
     playSequence([
       { freq: 1200, duration: 0.08, delay: 0 },
       { freq: 1600, duration: 0.08, delay: 0.08 },
@@ -132,6 +145,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // ICE spawns - alert siren
   const playIceAlert = useCallback(() => {
+    vibrate([50, 30, 50, 30, 100]); // Alert pattern
     if (isMuted) return;
 
     const ctx = getContext();
@@ -158,6 +172,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Suspicion warning (50%+) - tension sound
   const playSuspicionWarning = useCallback(() => {
+    vibrate(30); // Warning tap
     playSequence([
       { freq: 200, duration: 0.15, delay: 0 },
       { freq: 250, duration: 0.15, delay: 0.2 },
@@ -166,6 +181,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Suspicion critical (75%+) - heartbeat
   const playSuspicionCritical = useCallback(() => {
+    vibrate([40, 80, 60]); // Heartbeat pattern
     // Double beat like a heartbeat
     playTone(80, 0.1, 'sine', 0.3);
     setTimeout(() => {
@@ -175,6 +191,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Win - victory fanfare
   const playWin = useCallback(() => {
+    vibrate([30, 50, 30, 50, 30, 50, 100]); // Celebration pattern
     playSequence([
       { freq: 523, duration: 0.15, delay: 0 },      // C5
       { freq: 659, duration: 0.15, delay: 0.15 },   // E5
@@ -190,6 +207,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Lose - failure sound
   const playLose = useCallback(() => {
+    vibrate([100, 50, 200]); // Heavy thud
     playSequence([
       { freq: 400, duration: 0.2, delay: 0 },
       { freq: 350, duration: 0.2, delay: 0.2 },
@@ -200,6 +218,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Buy power-up - purchase confirmation
   const playPurchase = useCallback(() => {
+    vibrate([15, 30, 25]); // Quick confirmation
     playSequence([
       { freq: 600, duration: 0.08, delay: 0 },
       { freq: 800, duration: 0.08, delay: 0.08 },
@@ -209,6 +228,7 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Power-up activated - boost sound
   const playPowerUp = useCallback(() => {
+    vibrate([20, 20, 30, 20, 50]); // Rising intensity
     if (isMuted) return;
 
     const ctx = getContext();
@@ -233,11 +253,13 @@ export function useSoundEffects(isMuted: boolean) {
 
   // Button click - UI feedback
   const playClick = useCallback(() => {
+    vibrate(10); // Micro tap
     playTone(800, 0.05, 'square', 0.1);
   }, [playTone]);
 
   // Menu navigation
   const playMenuSelect = useCallback(() => {
+    vibrate(8); // Subtle tap
     playTone(600, 0.08, 'triangle', 0.15);
   }, [playTone]);
 
