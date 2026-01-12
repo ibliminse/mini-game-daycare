@@ -380,11 +380,6 @@ function updateIceAgentSearch(agent: IceAgent, state: GameState, dt: number): vo
   }
 }
 
-// Fix the parameter order in updateIceAgentPatrol call
-function updateIceAgentPatrol2(agent: IceAgent, dt: number, state: GameState): void {
-  updateIceAgentPatrol(agent, state, dt);
-}
-
 /**
  * Update all ICE agents
  */
