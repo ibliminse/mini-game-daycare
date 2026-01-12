@@ -936,79 +936,81 @@ export default function GameCanvas() {
 
       {/* === END SCREEN === */}
       {(isWin || isLose) && (
-        <div className="absolute inset-0 flex items-center justify-center p-4 fade-in"
+        <div className="absolute inset-0 flex items-center justify-center p-2 fade-in"
              style={{
                background: isWin
                  ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(22, 163, 74, 0.95) 100%)'
                  : 'linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(220, 38, 38, 0.95) 100%)',
                backdropFilter: 'blur(8px)',
              }}>
-          <div className="card p-6 w-full max-w-[400px] bounce-in">
+          <div className={`card bounce-in w-full ${isMobileLandscape ? 'p-3 max-w-[340px]' : 'p-6 max-w-[400px]'}`}>
             {/* Level badge */}
-            <div className="text-center mb-2">
-              <span className="inline-block px-4 py-1 rounded-full text-white text-sm font-medium"
+            <div className={`text-center ${isMobileLandscape ? 'mb-1' : 'mb-2'}`}>
+              <span className={`inline-block rounded-full text-white font-medium ${isMobileLandscape ? 'px-2 py-0.5 text-xs' : 'px-4 py-1 text-sm'}`}
                     style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
                 {LEVEL_SPECS[displayState.level]?.name || 'Unknown'}
               </span>
             </div>
 
-            <h1 className={`text-3xl font-black text-center mb-2 ${isWin ? 'text-green-600' : 'text-red-600'}`}>
+            <h1 className={`font-black text-center ${isMobileLandscape ? 'text-xl mb-1' : 'text-3xl mb-2'} ${isWin ? 'text-green-600' : 'text-red-600'}`}>
               {isWin
-                ? (displayState.level >= LEVEL_SPECS.length - 1 ? '🎉 GAME COMPLETE!' : '✓ INSPECTION PASSED!')
+                ? (displayState.level >= LEVEL_SPECS.length - 1 ? '🎉 COMPLETE!' : '✓ PASSED!')
                 : '✗ BUSTED!'}
             </h1>
 
-            <p className="text-gray-600 text-sm text-center mb-4">
-              {isWin
-                ? (displayState.level >= LEVEL_SPECS.length - 1
-                    ? 'You saved all the daycares!'
-                    : 'Ready for the next daycare?')
-                : 'An independent journalist caught you!'}
-            </p>
+            {!isMobileLandscape && (
+              <p className="text-gray-600 text-sm text-center mb-4">
+                {isWin
+                  ? (displayState.level >= LEVEL_SPECS.length - 1
+                      ? 'You saved all the daycares!'
+                      : 'Ready for the next daycare?')
+                  : 'An independent journalist caught you!'}
+              </p>
+            )}
 
             {/* Stats */}
-            <div className="grid grid-cols-2 gap-2 mb-4">
-              <div className="p-3 rounded-xl text-center text-white"
+            <div className={`grid grid-cols-4 ${isMobileLandscape ? 'gap-1 mb-2' : 'grid-cols-2 gap-2 mb-4'}`}>
+              <div className={`rounded-xl text-center text-white ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
                    style={{ background: 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)' }}>
-                <div className="text-2xl font-black">{displayState.enrollments}</div>
-                <div className="text-xs opacity-80">Enrollments</div>
+                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>{displayState.enrollments}</div>
+                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Enrolled</div>
               </div>
-              <div className="p-3 rounded-xl text-center"
+              <div className={`rounded-xl text-center ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
                    style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)', color: '#000' }}>
-                <div className="text-2xl font-black">${displayState.totalFunding}</div>
-                <div className="text-xs opacity-80">Saved</div>
+                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>${displayState.totalFunding}</div>
+                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Saved</div>
               </div>
-              <div className={`p-3 rounded-xl text-center text-white`}
+              <div className={`rounded-xl text-center text-white ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
                    style={{
                      background: displayState.suspicion <= LOSE_THRESHOLD
                        ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
                    }}>
-                <div className="text-2xl font-black">{Math.floor(displayState.suspicion)}%</div>
-                <div className="text-xs opacity-80">Suspicion {displayState.suspicion <= LOSE_THRESHOLD ? '✓' : '✗'}</div>
+                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>{Math.floor(displayState.suspicion)}%</div>
+                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Suspicion</div>
               </div>
-              <div className="p-3 rounded-xl text-center text-white"
+              <div className={`rounded-xl text-center text-white ${isMobileLandscape ? 'p-1.5' : 'p-3'}`}
                    style={{ background: 'linear-gradient(135deg, #4189DD 0%, #2d6bc4 100%)' }}>
-                <div className="text-2xl font-black">{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
-                <div className="text-xs opacity-80">Capacity</div>
+                <div className={`font-black ${isMobileLandscape ? 'text-lg' : 'text-2xl'}`}>{CARRY_CAPACITY + persistentUpgrades.carryCapacity}</div>
+                <div className={`opacity-80 ${isMobileLandscape ? 'text-[10px]' : 'text-xs'}`}>Capacity</div>
               </div>
             </div>
 
             {/* Buttons */}
-            <div className="flex gap-2 mb-2">
+            <div className={`flex ${isMobileLandscape ? 'gap-1 mb-1' : 'gap-2 mb-2'}`}>
               <button onClick={handleRestart}
-                      className={`flex-1 py-3 text-white font-bold rounded-xl ${isWin ? 'btn-success' : 'btn-danger'}`}>
+                      className={`flex-1 text-white font-bold rounded-xl ${isMobileLandscape ? 'py-2 text-sm' : 'py-3'} ${isWin ? 'btn-success' : 'btn-danger'}`}>
                 ↻ RETRY
               </button>
               {isWin && displayState.level < LEVEL_SPECS.length - 1 && (
-                <button onClick={handleNextLevel} className="flex-1 py-3 text-white font-bold rounded-xl btn-primary">
+                <button onClick={handleNextLevel} className={`flex-1 text-white font-bold rounded-xl btn-primary ${isMobileLandscape ? 'py-2 text-sm' : 'py-3'}`}>
                   NEXT →
                 </button>
               )}
             </div>
 
             <button onClick={handleMenu}
-                    className="w-full py-2 font-medium rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+                    className={`w-full font-medium rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors ${isMobileLandscape ? 'py-1.5 text-sm' : 'py-2'}`}>
               ← Menu
             </button>
           </div>

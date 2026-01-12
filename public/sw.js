@@ -1,5 +1,5 @@
 // Service Worker for Learing - Somali Daycare Simulator
-const CACHE_NAME = 'learing-v2.0.0';
+const CACHE_NAME = 'learing-v2.0.1';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache immediately on install
