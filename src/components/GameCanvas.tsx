@@ -406,18 +406,6 @@ export default function GameCanvas() {
       {/* Game canvas */}
       {displayState.phase !== 'menu' && (
         <div className="absolute inset-0 flex items-center justify-center">
-          {/* Handheld overlay frame for mobile landscape */}
-          {isMobileLandscape && (
-            <div
-              className="absolute inset-0 pointer-events-none z-10"
-              style={{
-                backgroundImage: 'url(/overlay/handheld-landscape.png)',
-                backgroundSize: 'contain',
-                backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat',
-              }}
-            />
-          )}
           <canvas
             ref={canvasRef}
             width={MAP_WIDTH}
@@ -425,7 +413,6 @@ export default function GameCanvas() {
             className="max-w-full max-h-full shadow-2xl rounded-lg"
             style={{
               imageRendering: 'pixelated',
-              height: isMobileLandscape ? '55%' : '100%',
             }}
             aria-label="Game canvas - use arrow keys or WASD to move"
             tabIndex={0}

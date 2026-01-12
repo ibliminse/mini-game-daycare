@@ -1,5 +1,5 @@
 // Service Worker for Learing - Somali Daycare Simulator
-const CACHE_NAME = 'learing-v1.3.0';
+const CACHE_NAME = 'learing-v1.4.0';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache immediately on install
@@ -9,7 +9,6 @@ const PRECACHE_ASSETS = [
   '/manifest.json',
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  '/overlay/handheld-landscape.png',
   '/audio/menu.mp3',
   '/audio/gameplay.mp3',
 ];
@@ -93,4 +92,4 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
-// Deploy trigger Sun Jan 11 20:45:00 EST 2026 - Visual effects
+// Deploy trigger Sun Jan 11 21:00:00 EST 2026 - Remove overlay
