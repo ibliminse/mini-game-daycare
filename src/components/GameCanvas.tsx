@@ -440,23 +440,99 @@ export default function GameCanvas() {
              style={{ background: '#B8D4E8' }}>
           {/* Clipboard */}
           <div className="relative w-full max-w-[420px] fade-in">
-            {/* Blackboard clips - circles that clip over the edge */}
-            <div className="absolute -top-3 left-8 w-8 h-8 rounded-full z-10" style={{ background: '#5BA3E0', boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.3)' }} />
-            <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 w-7 h-7 rounded-full z-10" style={{ background: '#5BA3E0', boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.2), inset 2px 2px 4px rgba(255,255,255,0.3)' }} />
-            <div className="absolute -top-3 right-8 w-8 h-8 rounded-full bg-white z-10" style={{ boxShadow: 'inset -2px -2px 4px rgba(0,0,0,0.1), inset 2px 2px 4px rgba(255,255,255,0.5)' }} />
-            {/* Crayon */}
-            <div className="absolute top-24 -right-1 z-10 rotate-[30deg]" style={{ transformOrigin: 'center' }}>
-              {/* Crayon body */}
-              <div className="w-4 h-14 rounded-sm" style={{ background: 'linear-gradient(90deg, #d4a574 0%, #e8c9a0 30%, #d4a574 70%, #b8956a 100%)' }} />
-              {/* Crayon tip */}
-              <div className="w-4 h-4 mx-auto" style={{
-                background: '#e74c3c',
-                clipPath: 'polygon(0% 0%, 100% 0%, 50% 100%)',
-                boxShadow: 'inset -1px 0 2px rgba(0,0,0,0.3)'
-              }} />
+            {/* Realistic Pushpins */}
+            {/* Blue pushpin - left */}
+            <div className="absolute -top-2 left-8 z-10">
+              <div className="relative w-7 h-7">
+                {/* Pin head - domed top */}
+                <div className="absolute inset-0 rounded-full" style={{
+                  background: 'radial-gradient(ellipse at 30% 30%, #7EC8F3 0%, #4BA3D9 40%, #2E7AB8 80%, #1E5A8A 100%)',
+                  boxShadow: '0 3px 6px rgba(0,0,0,0.4), inset 0 -2px 4px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.4)',
+                }} />
+                {/* Pin center dimple */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full" style={{
+                  background: 'radial-gradient(circle at 60% 40%, #3B8BC2 0%, #2A6A9E 100%)',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)',
+                }} />
+              </div>
+              {/* Pin shadow on board */}
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-2 rounded-full bg-black/20 blur-[2px]" />
             </div>
+
+            {/* Blue pushpin - center */}
+            <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 z-10">
+              <div className="relative w-6 h-6">
+                <div className="absolute inset-0 rounded-full" style={{
+                  background: 'radial-gradient(ellipse at 30% 30%, #7EC8F3 0%, #4BA3D9 40%, #2E7AB8 80%, #1E5A8A 100%)',
+                  boxShadow: '0 3px 5px rgba(0,0,0,0.35), inset 0 -2px 3px rgba(0,0,0,0.2), inset 0 2px 3px rgba(255,255,255,0.4)',
+                }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full" style={{
+                  background: 'radial-gradient(circle at 60% 40%, #3B8BC2 0%, #2A6A9E 100%)',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.3)',
+                }} />
+              </div>
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-1.5 rounded-full bg-black/20 blur-[2px]" />
+            </div>
+
+            {/* White/Pearl pushpin - right */}
+            <div className="absolute -top-2 right-8 z-10">
+              <div className="relative w-7 h-7">
+                <div className="absolute inset-0 rounded-full" style={{
+                  background: 'radial-gradient(ellipse at 30% 30%, #FFFFFF 0%, #F0F0F0 30%, #D8D8D8 60%, #B8B8B8 100%)',
+                  boxShadow: '0 3px 6px rgba(0,0,0,0.35), inset 0 -2px 4px rgba(0,0,0,0.15), inset 0 2px 4px rgba(255,255,255,0.8)',
+                }} />
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full" style={{
+                  background: 'radial-gradient(circle at 60% 40%, #E8E8E8 0%, #C0C0C0 100%)',
+                  boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.2)',
+                }} />
+              </div>
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-2 rounded-full bg-black/20 blur-[2px]" />
+            </div>
+
+            {/* Realistic Crayon */}
+            <div className="absolute top-20 -right-2 z-10 rotate-[25deg]" style={{ transformOrigin: 'center' }}>
+              {/* Crayon shadow */}
+              <div className="absolute top-2 left-1 w-5 h-20 bg-black/20 blur-[3px] rounded-sm" style={{ transform: 'skewX(-5deg)' }} />
+
+              {/* Crayon body */}
+              <div className="relative w-5 h-16 rounded-t-sm overflow-hidden" style={{
+                background: 'linear-gradient(90deg, #C41E3A 0%, #E63950 25%, #DC143C 50%, #B91C38 75%, #8B0000 100%)',
+                boxShadow: 'inset 2px 0 4px rgba(255,255,255,0.3), inset -2px 0 4px rgba(0,0,0,0.3)',
+              }}>
+                {/* Paper wrapper */}
+                <div className="absolute bottom-0 left-0 right-0 h-10" style={{
+                  background: 'linear-gradient(90deg, #1a1a1a 0%, #3a3a3a 20%, #2a2a2a 50%, #1a1a1a 80%, #0a0a0a 100%)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+                }}>
+                  {/* Wrapper texture lines */}
+                  <div className="absolute inset-0 opacity-20" style={{
+                    backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 3px)',
+                  }} />
+                  {/* Brand oval */}
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 w-4 h-6 rounded-full border border-yellow-600/60 flex items-center justify-center overflow-hidden">
+                    <span className="text-yellow-500/80 text-[5px] font-bold tracking-tighter" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>CRAYOLA</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Crayon tip - tapered and slightly worn */}
+              <div className="relative w-5 h-5">
+                <div style={{
+                  width: '100%',
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #C41E3A 0%, #E63950 30%, #DC143C 50%, #B91C38 70%, #8B0000 100%)',
+                  clipPath: 'polygon(10% 0%, 90% 0%, 60% 100%, 40% 100%)',
+                  boxShadow: 'inset 1px 0 2px rgba(255,255,255,0.2), inset -1px 0 2px rgba(0,0,0,0.3)',
+                }} />
+                {/* Tip wear mark */}
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-0.5 rounded-full" style={{
+                  background: 'linear-gradient(90deg, #A01830 0%, #D02040 50%, #A01830 100%)',
+                }} />
+              </div>
+            </div>
+
             {/* Star decoration */}
-            <div className="absolute top-16 right-12 text-blue-300/30 text-sm">✦</div>
+            <div className="absolute top-16 right-14 text-yellow-400/40 text-sm">✦</div>
 
             {/* Clipboard board - cork board style */}
             <div className="rounded-2xl p-4 pt-6" style={{ background: '#C9A66B', border: '5px solid #A67B4B' }}>
