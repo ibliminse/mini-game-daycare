@@ -1,5 +1,5 @@
 // Service Worker for Learing - Somali Daycare Simulator
-const CACHE_NAME = 'learing-v1.1.0';
+const CACHE_NAME = 'learing-v1.2.0';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache immediately on install
@@ -93,4 +93,4 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
-// Deploy trigger Sun Jan 11 20:15:00 EST 2026 - HUD redesign
+// Deploy trigger Sun Jan 11 20:30:00 EST 2026 - Sound effects

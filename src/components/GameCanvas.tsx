@@ -10,6 +10,7 @@ import { MAP_WIDTH, MAP_HEIGHT, MAX_SUSPICION, WARNING_THRESHOLD, COLORS, LEVEL_
 import { resetIceTimer } from '@/game/update';
 import { Upgrades } from '@/game/types';
 import { useAudio } from '@/hooks/useAudio';
+import { useSoundEffects } from '@/hooks/useSoundEffects';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +32,16 @@ export default function GameCanvas() {
 
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
+  const sfx = useSoundEffects(isMuted);
+
+  // Track previous state for sound effect triggers
+  const prevStateRef = useRef({
+    carrying: 0,
+    enrollments: 0,
+    iceCount: 0,
+    suspicionLevel: 0, // 0 = normal, 1 = warning (50%+), 2 = critical (75%+)
+    phase: 'menu' as string,
+  });
 
   useEffect(() => {
     try {
@@ -70,31 +81,97 @@ export default function GameCanvas() {
     }
   }, [displayState.phase, playTrack]);
 
+  // Sound effects based on state changes
+  useEffect(() => {
+    const prev = prevStateRef.current;
+    const curr = displayState;
+
+    // Only trigger sounds during gameplay
+    if (curr.phase === 'playing') {
+      // Form collected
+      if (curr.player.carrying > prev.carrying) {
+        sfx.playCollect();
+      }
+
+      // Forms dropped off at desk
+      if (curr.enrollments > prev.enrollments) {
+        sfx.playDropOff();
+      }
+
+      // ICE spawned
+      const currIceCount = curr.iceAgents?.length || 0;
+      if (currIceCount > prev.iceCount) {
+        sfx.playIceAlert();
+      }
+
+      // Suspicion level changes
+      const suspicionPercent = (curr.suspicion / MAX_SUSPICION) * 100;
+      const currSuspicionLevel = suspicionPercent >= WARNING_THRESHOLD ? 2 : suspicionPercent >= 50 ? 1 : 0;
+
+      if (currSuspicionLevel > prev.suspicionLevel) {
+        if (currSuspicionLevel === 2) {
+          sfx.playSuspicionCritical();
+        } else if (currSuspicionLevel === 1) {
+          sfx.playSuspicionWarning();
+        }
+      }
+
+      // Update prev state
+      prevStateRef.current = {
+        carrying: curr.player.carrying,
+        enrollments: curr.enrollments,
+        iceCount: currIceCount,
+        suspicionLevel: currSuspicionLevel,
+        phase: curr.phase,
+      };
+    }
+
+    // Win/Lose sounds
+    if (curr.phase === 'win' && prev.phase === 'playing') {
+      sfx.playWin();
+    }
+    if (curr.phase === 'lose' && prev.phase === 'playing') {
+      sfx.playLose();
+    }
+
+    // Update phase tracking
+    if (curr.phase !== prev.phase) {
+      prevStateRef.current.phase = curr.phase;
+    }
+  }, [displayState, sfx]);
+
   const handleStart = useCallback(() => {
+    sfx.playClick();
     resetIceTimer();
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, persistentFunding);
     gameStateRef.current.phase = 'playing';
+    // Reset sound state tracking for new game
+    prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
-  }, [currentLevel, persistentUpgrades, persistentFunding]);
+  }, [currentLevel, persistentUpgrades, persistentFunding, sfx]);
 
   const handleRestart = useCallback(() => {
+    sfx.playClick();
     resetIceTimer();
     const currentLevel = gameStateRef.current.level;
     setPersistentFunding(gameStateRef.current.totalFunding);
     gameStateRef.current = createInitialState(currentLevel, persistentUpgrades, gameStateRef.current.totalFunding);
     gameStateRef.current.phase = 'playing';
+    prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
-  }, [persistentUpgrades]);
+  }, [persistentUpgrades, sfx]);
 
   const handleNextLevel = useCallback(() => {
+    sfx.playClick();
     const nextLevel = Math.min(gameStateRef.current.level + 1, LEVEL_SPECS.length - 1);
     setCurrentLevel(nextLevel);
     resetIceTimer();
     setPersistentFunding(gameStateRef.current.totalFunding);
     gameStateRef.current = createInitialState(nextLevel, persistentUpgrades, gameStateRef.current.totalFunding);
     gameStateRef.current.phase = 'playing';
+    prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
-  }, [persistentUpgrades]);
+  }, [persistentUpgrades, sfx]);
 
   const handleMenu = useCallback(() => {
     setPersistentFunding(gameStateRef.current.totalFunding);
@@ -122,6 +199,7 @@ export default function GameCanvas() {
       ? gameStateRef.current.totalFunding : persistentFunding;
     if (availableFunding < UPGRADE_COSTS.carryCapacity) return;
 
+    sfx.playPurchase();
     const newUpgrades = { ...persistentUpgrades, carryCapacity: persistentUpgrades.carryCapacity + 1 };
     const newFunding = availableFunding - UPGRADE_COSTS.carryCapacity;
     setPersistentUpgrades(newUpgrades);
@@ -137,27 +215,31 @@ export default function GameCanvas() {
       gameStateRef.current.player.carryCapacity = CARRY_CAPACITY + newUpgrades.carryCapacity;
       setDisplayState({ ...gameStateRef.current });
     }
-  }, [persistentUpgrades, persistentFunding, currentLevel]);
+  }, [persistentUpgrades, persistentFunding, currentLevel, sfx]);
 
   const handleBuySprint = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
     if (gameStateRef.current.totalFunding < UPGRADE_COSTS.sprint) return;
     if (gameStateRef.current.sprintTimer > 0) return;
+    sfx.playPurchase();
+    sfx.playPowerUp();
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.sprint;
     gameStateRef.current.sprintTimer = SPRINT_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
-  }, []);
+  }, [sfx]);
 
   const handleBuyNoIce = useCallback(() => {
     if (gameStateRef.current.phase !== 'playing') return;
     if (gameStateRef.current.totalFunding < UPGRADE_COSTS.noIce) return;
     if (gameStateRef.current.noIceTimer > 0) return;
+    sfx.playPurchase();
+    sfx.playPowerUp();
     gameStateRef.current.totalFunding -= UPGRADE_COSTS.noIce;
     gameStateRef.current.noIceTimer = NO_ICE_DURATION;
     setPersistentFunding(gameStateRef.current.totalFunding);
     setDisplayState({ ...gameStateRef.current });
-  }, []);
+  }, [sfx]);
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickStateRef.current = { active: true, dx, dy };
