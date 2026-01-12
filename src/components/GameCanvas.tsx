@@ -22,6 +22,14 @@ import {
   addToLeaderboard,
   loadLeaderboard,
 } from '@/game/achievements';
+import {
+  DailyChallenge,
+  ChallengeStatus,
+  updateDailyStats,
+  getChallengeStatuses,
+  claimChallengeReward,
+  getTimeUntilReset,
+} from '@/game/dailyChallenges';
 
 export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -56,6 +64,11 @@ export default function GameCanvas() {
   const [highScoreInitials, setHighScoreInitials] = useState<string>('');
   const [showAchievementsModal, setShowAchievementsModal] = useState<boolean>(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
+
+  // Daily challenges state
+  const [newlyCompletedChallenges, setNewlyCompletedChallenges] = useState<DailyChallenge[]>([]);
+  const [showDailyChallengesModal, setShowDailyChallengesModal] = useState<boolean>(false);
+  const [challengeStatuses, setChallengeStatuses] = useState<ChallengeStatus[]>([]);
 
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
@@ -187,6 +200,18 @@ export default function GameCanvas() {
         setShowHighScoreEntry(true);
         setHighScoreInitials('');
       }
+
+      // Update daily challenges
+      const { newlyCompleted } = updateDailyStats(
+        curr.totalFormsCollected,
+        true,
+        curr.funding,
+        curr.level,
+        curr.iceEncounters,
+        curr.difficulty
+      );
+      setNewlyCompletedChallenges(newlyCompleted);
+      setChallengeStatuses(getChallengeStatuses());
     }
     if (curr.phase === 'lose' && prev.phase === 'playing') {
       sfx.playLose();
@@ -209,6 +234,18 @@ export default function GameCanvas() {
       setNewAchievements(unlocked);
       setFinalScore(0);
       setShowHighScoreEntry(false);
+
+      // Update daily challenges (forms still count even on loss)
+      const { newlyCompleted } = updateDailyStats(
+        curr.totalFormsCollected,
+        false,
+        curr.funding,
+        curr.level,
+        curr.iceEncounters,
+        curr.difficulty
+      );
+      setNewlyCompletedChallenges(newlyCompleted);
+      setChallengeStatuses(getChallengeStatuses());
     }
 
     // Update phase tracking
@@ -224,8 +261,9 @@ export default function GameCanvas() {
     gameStateRef.current.phase = 'playing';
     // Reset sound state tracking for new game
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
-    // Reset achievements state
+    // Reset achievements and daily challenge state
     setNewAchievements([]);
+    setNewlyCompletedChallenges([]);
     setShowHighScoreEntry(false);
     setFinalScore(0);
     setDisplayState({ ...gameStateRef.current });
@@ -350,6 +388,15 @@ export default function GameCanvas() {
     });
     setShowHighScoreEntry(false);
   }, [highScoreInitials, finalScore, displayState.level, displayState.difficulty, sfx]);
+
+  const handleClaimChallengeReward = useCallback((challengeId: string) => {
+    const reward = claimChallengeReward(challengeId);
+    if (reward > 0) {
+      sfx.playPurchase();
+      setPersistentFunding(prev => prev + reward);
+      setChallengeStatuses(getChallengeStatuses());
+    }
+  }, [sfx]);
 
   const handleJoystickMove = useCallback((dx: number, dy: number) => {
     joystickStateRef.current = { active: true, dx, dy };
@@ -722,18 +769,34 @@ export default function GameCanvas() {
                 </button>
               </div>
 
+              {/* Daily Challenges Button */}
+              <button
+                onClick={() => { sfx.playClick(); setChallengeStatuses(getChallengeStatuses()); setShowDailyChallengesModal(true); }}
+                className="w-full mt-3 py-2.5 rounded-lg font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98] flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #E74C3C 0%, #C0392B 100%)', color: 'white' }}
+              >
+                <span>📅</span>
+                <span>Daily Challenges</span>
+                <span className="bg-white/20 px-2 py-0.5 rounded text-xs">
+                  {(() => {
+                    const time = getTimeUntilReset();
+                    return `${time.hours}h ${time.minutes}m`;
+                  })()}
+                </span>
+              </button>
+
               {/* Achievements & Leaderboard Buttons */}
-              <div className="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-2">
                 <button
                   onClick={() => { sfx.playClick(); setShowAchievementsModal(true); }}
-                  className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                  className="flex-1 py-2 rounded-lg font-bold text-xs transition-all hover:brightness-110 active:scale-[0.98]"
                   style={{ background: '#9B59B6', color: 'white' }}
                 >
                   🏆 Achievements
                 </button>
                 <button
                   onClick={() => { sfx.playClick(); setShowLeaderboardModal(true); }}
-                  className="flex-1 py-2.5 rounded-lg font-bold text-sm transition-all hover:brightness-110 active:scale-[0.98]"
+                  className="flex-1 py-2 rounded-lg font-bold text-xs transition-all hover:brightness-110 active:scale-[0.98]"
                   style={{ background: '#E67E22', color: 'white' }}
                 >
                   🎮 Leaderboard
@@ -1111,6 +1174,21 @@ export default function GameCanvas() {
               </div>
             )}
 
+            {/* Daily Challenge Completed */}
+            {newlyCompletedChallenges.length > 0 && (
+              <div className={`rounded-xl p-2 mb-2 ${isMobileLandscape ? 'mb-1' : 'mb-3'}`}
+                   style={{ background: 'linear-gradient(135deg, #E74C3C 0%, #C0392B 100%)' }}>
+                <div className="text-white text-xs font-bold text-center mb-1">📅 DAILY CHALLENGE COMPLETE!</div>
+                <div className="flex flex-wrap justify-center gap-1">
+                  {newlyCompletedChallenges.map(c => (
+                    <span key={c.id} className="bg-white/20 rounded px-2 py-0.5 text-white text-xs">
+                      {c.icon} {c.name} (+${c.reward})
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* High Score Entry */}
             {showHighScoreEntry && isWin && (
               <div className={`rounded-xl p-2 mb-2 ${isMobileLandscape ? 'mb-1' : 'mb-3'}`}
@@ -1276,6 +1354,81 @@ export default function GameCanvas() {
             </div>
             <button
               onClick={() => setShowLeaderboardModal(false)}
+              className="w-full mt-4 py-2 font-bold rounded-xl btn-primary text-white"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* === DAILY CHALLENGES MODAL === */}
+      {showDailyChallengesModal && (
+        <div className="absolute inset-0 flex items-center justify-center p-4 z-50 fade-in"
+             style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}>
+          <div className="card p-4 w-full max-w-[380px] max-h-[80vh] overflow-auto bounce-in">
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-xl font-black text-gray-800">📅 Daily Challenges</h2>
+              <button
+                onClick={() => setShowDailyChallengesModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Time until reset */}
+            <div className="text-center text-sm text-gray-500 mb-3">
+              Resets in {(() => {
+                const time = getTimeUntilReset();
+                return `${time.hours}h ${time.minutes}m`;
+              })()}
+            </div>
+
+            <div className="space-y-2">
+              {challengeStatuses.map(({ challenge, current, completed, claimed }) => (
+                <div
+                  key={challenge.id}
+                  className={`p-3 rounded-lg ${completed ? 'bg-green-50 border border-green-200' : 'bg-gray-50'}`}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-2xl">{challenge.icon}</span>
+                    <div className="flex-1">
+                      <div className={`font-bold ${completed ? 'text-green-700' : 'text-gray-800'}`}>
+                        {challenge.name}
+                      </div>
+                      <div className="text-xs text-gray-600">{challenge.description}</div>
+                      {/* Progress bar */}
+                      <div className="mt-1.5 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${completed ? 'bg-green-500' : 'bg-blue-500'}`}
+                          style={{ width: `${Math.min(100, (current / challenge.target) * 100)}%` }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {current}/{challenge.target}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {completed && !claimed ? (
+                        <button
+                          onClick={() => handleClaimChallengeReward(challenge.id)}
+                          className="px-2 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600 transition-colors animate-pulse"
+                        >
+                          +${challenge.reward}
+                        </button>
+                      ) : completed && claimed ? (
+                        <span className="text-green-500 text-sm">✓</span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">${challenge.reward}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowDailyChallengesModal(false)}
               className="w-full mt-4 py-2 font-bold rounded-xl btn-primary text-white"
             >
               Close
