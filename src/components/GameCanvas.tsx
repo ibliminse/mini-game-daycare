@@ -35,6 +35,9 @@ export default function GameCanvas() {
   const [showTutorial, setShowTutorial] = useState<boolean>(false);
   const tutorialTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Track if waiting for user to rotate device
+  const [waitingForRotation, setWaitingForRotation] = useState<boolean>(false);
+
   // Audio system
   const { playTrack, toggleMute, isMuted } = useAudio();
   const sfx = useSoundEffects(isMuted);
@@ -163,10 +166,18 @@ export default function GameCanvas() {
     prevStateRef.current = { carrying: 0, enrollments: 0, iceCount: 0, suspicionLevel: 0, phase: 'playing' };
     setDisplayState({ ...gameStateRef.current });
 
-    // Show tutorial for 8 seconds
-    setShowTutorial(true);
-    if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
-    tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
+    // If on mobile portrait, start paused and wait for rotation
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isMobile && isPortrait) {
+      setIsPaused(true);
+      setWaitingForRotation(true);
+    } else {
+      // Show tutorial for 8 seconds (only if not waiting for rotation)
+      setShowTutorial(true);
+      if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
+      tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
+    }
   }, [currentLevel, persistentUpgrades, persistentFunding, sfx]);
 
   const handleRestart = useCallback(() => {
@@ -328,6 +339,18 @@ export default function GameCanvas() {
       window.removeEventListener('orientationchange', checkOrientation);
     };
   }, []);
+
+  // Auto-resume game when user rotates to landscape (if waiting for rotation)
+  useEffect(() => {
+    if (waitingForRotation && isMobileLandscape) {
+      setWaitingForRotation(false);
+      setIsPaused(false);
+      // Now show tutorial
+      setShowTutorial(true);
+      if (tutorialTimerRef.current) clearTimeout(tutorialTimerRef.current);
+      tutorialTimerRef.current = setTimeout(() => setShowTutorial(false), 8000);
+    }
+  }, [waitingForRotation, isMobileLandscape]);
 
   // Floating joystick state for mobile
   const [joystickActive, setJoystickActive] = useState(false);
